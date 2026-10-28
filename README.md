@@ -4,3 +4,8 @@ WebApp em Appscript para o Retrô Chorume, onde os viewers super amáveis e soli
 
 (Não entendo por que Captain Novolin tá na lista, ok?)
 
+<div align="center">
+
+  <img src="image.png" alt="Retrô Chorume">
+
+</div>
