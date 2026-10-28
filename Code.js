@@ -5,11 +5,23 @@ const CONFIG = {
   CACHE_KEY: 'retro-chorume:data:v2',
 };
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.format === 'json') return jsonResponse_();
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('Retrô Chorume')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function jsonResponse_() {
+  let body;
+  try {
+    body = getData();
+  } catch (err) {
+    console.error(err);
+    body = { error: 'Não foi possível ler a planilha.' };
+  }
+  return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function include(name) {

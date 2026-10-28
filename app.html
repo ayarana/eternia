@@ -146,12 +146,34 @@
     return { games: games, updatedAt: data && data.updatedAt };
   }
 
+  function fetchData(ok, fail) {
+    if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getData();
+      return;
+    }
+    if (!window.RETRO_API_URL) { fail(new Error('Falta o endereço dos dados (RETRO_API_URL).')); return; }
+    fetch(window.RETRO_API_URL + '?format=json', { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('O servidor respondeu ' + res.status + '.');
+        return res.json();
+      })
+      .then(function (data) {
+        if (data && data.error) throw new Error(data.error);
+        ok(data);
+      })
+      .catch(function (err) {
+        fail(err instanceof SyntaxError
+          ? new Error('Resposta inesperada do Apps Script. Confira se a implantação está aberta para "Qualquer pessoa".')
+          : err);
+      });
+  }
+
   function load() {
     $foot.textContent = '';
-    google.script.run
-      .withSuccessHandler(function (data) { state.data = normalizeData(data); renderAll(); })
-      .withFailureHandler(function (err) { showError(err && err.message ? err.message : String(err)); })
-      .getData();
+    fetchData(
+      function (data) { state.data = normalizeData(data); renderAll(); },
+      function (err) { showError(err && err.message ? err.message : String(err)); }
+    );
   }
 
   function showError(message) {

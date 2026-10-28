@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apps-script:
+    name: Apps Script
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOYMENT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar clasp
+        run: npm install -g @google/clasp
+
+      - name: Credenciais do clasp
+        env:
+          CLASPRC: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          umask 077
+          printf '%s' "$CLASPRC" > ~/.clasprc.json
+
+      - name: Enviar código
+        run: clasp push --force
+
+      - name: Atualizar a implantação
+        env:
+          DEPLOYMENT_ID: ${{ vars.DEPLOYMENT_ID }}
+        run: clasp update-deployment "$DEPLOYMENT_ID" -d "$GITHUB_SHA"
+
+  site:
+    name: Site no Netlify
+    needs: apps-script
+    if: ${{ !cancelled() && (needs.apps-script.result == 'success' || needs.apps-script.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Montar o site
+        env:
+          APPS_SCRIPT_URL: https://script.google.com/macros/s/${{ vars.DEPLOYMENT_ID }}/exec
+        run: node scripts/build-site.mjs
+
+      - name: Publicar no Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: npx --yes netlify-cli@27.12.0 deploy --dir=dist --functions=netlify/functions --prod --no-build --message "$GITHUB_SHA"

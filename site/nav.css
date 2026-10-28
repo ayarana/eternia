@@ -1,0 +1,36 @@
+.sitenav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0.9rem 1rem 0.4rem;
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+}
+
+.sitenav a {
+  --fill: #000;
+  --edge: linear-gradient(135deg, #a99cf6, #ff8be8);
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  border: 2px solid transparent;
+  background: linear-gradient(var(--fill), var(--fill)) padding-box, var(--edge) border-box;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+  color: #e0daff;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.sitenav a:hover { --fill: #ff8be8; color: #000; }
+.sitenav a:focus-visible { outline: 3px solid #f6f08c; outline-offset: 2px; }
+
+.sitenav a[aria-current='page'] {
+  --fill: #f6f08c;
+  --edge: linear-gradient(135deg, #f6f08c, #ff8be8);
+  color: #000;
+}

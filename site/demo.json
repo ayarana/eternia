@@ -1,0 +1,341 @@
+{
+ "games": [
+  {
+   "title": "Sword of Sodan",
+   "done": false,
+   "console": "Mega Drive",
+   "viewer": "ZeldaLover",
+   "score": 4
+  },
+  {
+   "title": "Ballz 3D",
+   "done": false,
+   "console": "SNES",
+   "viewer": "Retro_Ana",
+   "score": 4.5
+  },
+  {
+   "title": "Captain Novolin",
+   "done": false,
+   "console": "SNES",
+   "viewer": "DRAGONQUEST_99",
+   "score": 2.5
+  },
+  {
+   "title": "Bebe's Kids",
+   "done": false,
+   "console": "SNES",
+   "viewer": "pixelfa",
+   "score": null
+  },
+  {
+   "title": "Time Crisis",
+   "done": false,
+   "console": "PS1",
+   "viewer": "ZeldaLover",
+   "score": 5
+  },
+  {
+   "title": "Cheetahmen II",
+   "done": false,
+   "console": "NES",
+   "viewer": "Miguxo_8bit",
+   "score": 0.5
+  },
+  {
+   "title": "Superman 64",
+   "done": false,
+   "console": "N64",
+   "viewer": "pixelfa",
+   "score": 3
+  },
+  {
+   "title": "Action 52",
+   "done": false,
+   "console": "NES",
+   "viewer": "Miguxo_8bit",
+   "score": null
+  },
+  {
+   "title": "Shaq Fu",
+   "done": false,
+   "console": "Mega Drive",
+   "viewer": "pixelfa",
+   "score": 4
+  },
+  {
+   "title": "Home Alone",
+   "done": false,
+   "console": "SNES",
+   "viewer": "Miguxo_8bit",
+   "score": 1
+  },
+  {
+   "title": "Bubsy 3D",
+   "done": false,
+   "console": "PS1",
+   "viewer": "RETRO_ANA",
+   "score": 0.5
+  },
+  {
+   "title": "Dark Castle",
+   "done": false,
+   "console": "Mega Drive",
+   "viewer": "captain_cheat",
+   "score": null
+  },
+  {
+   "title": "Dino Crisis 2",
+   "done": false,
+   "console": "PS1",
+   "viewer": "CHORUMEIRA",
+   "score": 6
+  },
+  {
+   "title": "Tomb Raider",
+   "done": true,
+   "console": "PS1",
+   "viewer": "pixelfa",
+   "score": 7
+  },
+  {
+   "title": "Crazy Taxi",
+   "done": false,
+   "console": "Dreamcast",
+   "viewer": "Retro_Ana",
+   "score": 2.5
+  },
+  {
+   "title": "Star Fox 64",
+   "done": false,
+   "console": "N64",
+   "viewer": "pixelfa",
+   "score": null
+  },
+  {
+   "title": "Pitfall",
+   "done": true,
+   "console": "Atari 2600",
+   "viewer": "CHORUMEIRA",
+   "score": 7
+  },
+  {
+   "title": "E.T.",
+   "done": false,
+   "console": "Atari 2600",
+   "viewer": "ZeldaLover",
+   "score": 4.5
+  },
+  {
+   "title": "Contra",
+   "done": false,
+   "console": "NES",
+   "viewer": "DRAGONQUEST_99",
+   "score": 3.5
+  },
+  {
+   "title": "Battletoads",
+   "done": false,
+   "console": "NES",
+   "viewer": null,
+   "score": null
+  },
+  {
+   "title": "Sonic R",
+   "done": false,
+   "console": "Saturn",
+   "viewer": "tia_do_cartucho",
+   "score": 0.5
+  },
+  {
+   "title": "Mortal Kombat Mythologies",
+   "done": false,
+   "console": "PS1",
+   "viewer": "TIA_DO_CARTUCHO",
+   "score": 1
+  },
+  {
+   "title": "Daytona USA",
+   "done": false,
+   "console": "Saturn",
+   "viewer": "ZeldaLover",
+   "score": 5
+  },
+  {
+   "title": "Ecco the Dolphin",
+   "done": false,
+   "console": "Mega Drive",
+   "viewer": "chorumeira",
+   "score": null
+  },
+  {
+   "title": "Metal Slug",
+   "done": false,
+   "console": "Neo Geo",
+   "viewer": null,
+   "score": 3
+  },
+  {
+   "title": "Streets of Rage 2",
+   "done": false,
+   "console": "Mega Drive",
+   "viewer": "ZeldaLover",
+   "score": 5
+  },
+  {
+   "title": "Kirby's Dream Land",
+   "done": false,
+   "console": "GB",
+   "viewer": "captain_cheat",
+   "score": 1.5
+  },
+  {
+   "title": "Pokemon Pinball",
+   "done": false,
+   "console": "GBC",
+   "viewer": "tia_do_cartucho",
+   "score": null
+  },
+  {
+   "title": "Wario Land",
+   "done": false,
+   "console": "GB",
+   "viewer": "Miguxo_8bit",
+   "score": 3.5
+  },
+  {
+   "title": "Advance Wars",
+   "done": true,
+   "console": "GBA",
+   "viewer": null,
+   "score": 1
+  },
+  {
+   "title": "Golden Sun",
+   "done": false,
+   "console": "GBA",
+   "viewer": "kenzo_bits",
+   "score": 7
+  },
+  {
+   "title": "Bomberman 64",
+   "done": false,
+   "console": "N64",
+   "viewer": "tia_do_cartucho",
+   "score": null
+  },
+  {
+   "title": "Rayman",
+   "done": false,
+   "console": "PS1",
+   "viewer": "chorumeira",
+   "score": 4
+  },
+  {
+   "title": "Gex",
+   "done": false,
+   "console": "PS1",
+   "viewer": "tia_do_cartucho",
+   "score": 2
+  },
+  {
+   "title": "Taz-Mania",
+   "done": true,
+   "console": "Mega Drive",
+   "viewer": "pixelfa",
+   "score": 3.5
+  },
+  {
+   "title": "Cool Spot",
+   "done": false,
+   "console": "SNES",
+   "viewer": "dragonquest_99",
+   "score": null
+  },
+  {
+   "title": "Earthworm Jim",
+   "done": false,
+   "console": "SNES",
+   "viewer": "dragonquest_99",
+   "score": 1.5
+  },
+  {
+   "title": "Chrono Trigger",
+   "done": false,
+   "console": "SNES",
+   "viewer": "Miguxo_8bit",
+   "score": 1.5
+  },
+  {
+   "title": "Donkey Kong Country",
+   "done": true,
+   "console": "SNES",
+   "viewer": "ZeldaLover",
+   "score": 7
+  },
+  {
+   "title": "Skate or Die",
+   "done": false,
+   "console": "NES",
+   "viewer": "tia_do_cartucho",
+   "score": null
+  },
+  {
+   "title": "Bible Adventures",
+   "done": false,
+   "console": "NES",
+   "viewer": "KENZO_BITS",
+   "score": 1
+  },
+  {
+   "title": "Pac-Man",
+   "done": false,
+   "console": "Atari 2600",
+   "viewer": "pixelfa",
+   "score": 7
+  },
+  {
+   "title": "Crash Bandicoot",
+   "done": true,
+   "console": "PS1",
+   "viewer": "luaDoMeioDia",
+   "score": 6
+  },
+  {
+   "title": "Spyro",
+   "done": false,
+   "console": "PS1",
+   "viewer": "CAPTAIN_CHEAT",
+   "score": null
+  },
+  {
+   "title": "Vigilante 8",
+   "done": false,
+   "console": "N64",
+   "viewer": "ZeldaLover",
+   "score": 5
+  },
+  {
+   "title": "Turok",
+   "done": false,
+   "console": "N64",
+   "viewer": "PIXELFA",
+   "score": 1
+  },
+  {
+   "title": "Gran Turismo",
+   "done": false,
+   "console": "PS1",
+   "viewer": "kenzo_bits",
+   "score": 7
+  },
+  {
+   "title": "Parodius",
+   "done": false,
+   "console": "SNES",
+   "viewer": "tia_do_cartucho",
+   "score": null
+  }
+ ],
+ "updatedAt": "2026-01-01T12:00:00.000Z"
+}

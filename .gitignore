@@ -1,7 +1,11 @@
 .clasprc.json
-.clasp.json
 .env
 .env.*
 node_modules/
 .DS_Store
 Thumbs.db
+dist/
+.netlify/
+
+site/assets/aleatorios/*
+!site/assets/aleatorios/LEIAME.txt

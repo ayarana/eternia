@@ -1,0 +1,8 @@
+site/**
+scripts/**
+dist/**
+node_modules/**
+package.json
+package-lock.json
+.github/**
+.netlify/**

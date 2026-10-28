@@ -1,0 +1,10 @@
+{
+  "name": "retro-chorume",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "demo": "node scripts/build-site.mjs --demo && python -m http.server 8000 --directory dist"
+  },
+  "engines": { "node": ">=22" }
+}
