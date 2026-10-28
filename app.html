@@ -1,0 +1,644 @@
+<script>
+  var MAX_SCORE = 10;
+
+  var BAD_SCORE = 2;
+
+  function norm(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  }
+
+  function mean(list) {
+    if (!list.length) return null;
+    var sum = 0;
+    for (var i = 0; i < list.length; i++) sum += list[i];
+    return sum / list.length;
+  }
+
+  function summarize(games) {
+    var scores = games.filter(function (g) { return g.score !== null; }).map(function (g) { return g.score; });
+    return { total: games.length, played: scores.length, queue: games.length - scores.length, avg: mean(scores) };
+  }
+
+  function groupStats(games, field) {
+    var groups = {};
+    var order = [];
+    games.forEach(function (g) {
+      var raw = g[field];
+      if (!raw) return;
+      var key = field === 'viewer' ? norm(raw) : raw;
+      if (!groups[key]) { groups[key] = { spellings: {}, games: [] }; order.push(key); }
+      groups[key].spellings[raw] = (groups[key].spellings[raw] || 0) + 1;
+      groups[key].games.push(g);
+    });
+    return order.map(function (key) {
+      var grp = groups[key];
+      var name = Object.keys(grp.spellings).sort(function (a, b) {
+        return grp.spellings[b] - grp.spellings[a];
+      })[0];
+      var s = summarize(grp.games);
+      return { key: key, name: name, total: s.total, played: s.played, avg: s.avg };
+    });
+  }
+
+  function histogram(games, maxScore) {
+    var bins = new Array(maxScore * 2).fill(0);
+    games.forEach(function (g) {
+      if (g.score === null) return;
+      var i = Math.round(g.score * 2) - 1;
+      bins[Math.min(Math.max(i, 0), bins.length - 1)]++;
+    });
+    return bins;
+  }
+
+  function rankOf(game, scored, order) {
+    var better = 0;
+    for (var i = 0; i < scored.length; i++) {
+      if (order === 'asc' ? scored[i].score < game.score : scored[i].score > game.score) better++;
+    }
+    return better + 1;
+  }
+
+  function sortGames(list, order) {
+    return list.slice().sort(function (a, b) {
+      var d = order === 'asc' ? a.score - b.score : b.score - a.score;
+      return d || a.title.localeCompare(b.title, 'pt-BR');
+    });
+  }
+  function sideStats(games, badLimit) {
+    var scored = games.filter(function (g) { return g.score !== null; });
+    var byName = function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); };
+    var consoles = groupStats(games, 'console');
+    var bands = [0, 0, 0, 0];
+    scored.forEach(function (g) {
+      bands[g.score <= badLimit ? 0 : g.score <= 4 ? 1 : g.score <= 6 ? 2 : 3]++;
+    });
+    return {
+      consolesByTotal: consoles.slice().sort(function (a, b) { return b.total - a.total || byName(a, b); }),
+      consolesWorst: consoles.filter(function (c) { return c.played >= 5; })
+        .sort(function (a, b) { return a.avg - b.avg || byName(a, b); }),
+      badViewers: groupStats(scored.filter(function (g) { return g.score <= badLimit; }), 'viewer')
+        .sort(function (a, b) { return b.total - a.total || byName(a, b); }),
+      viewersByTotal: groupStats(games, 'viewer')
+        .sort(function (a, b) { return b.total - a.total || byName(a, b); }),
+      bands: bands,
+      worst: sortGames(scored, 'asc').slice(0, 5),
+      best: sortGames(scored, 'desc')[0] || null,
+      zerados: games.filter(function (g) { return g.done; }).length
+    };
+  }
+
+  function buildReel(pool, rows, rnd) {
+    var pick = function () { return pool[Math.floor(rnd() * pool.length)]; };
+    var items = [];
+    var prev = null;
+    var next = function () {
+      var g = pick();
+      for (var t = 0; pool.length > 1 && g === prev && t < 30; t++) g = pick();
+      prev = g;
+      return g;
+    };
+    var winner = pick();
+    for (var i = 0; i < rows; i++) {
+      var g = next();
+      if (i === rows - 1 && pool.length > 1 && g === winner) g = pool[(pool.indexOf(g) + 1) % pool.length];
+      items.push(g);
+      prev = g;
+    }
+    items.push(winner);
+    prev = winner;
+    items.push(next());
+    items.push(next());
+    return { items: items, index: rows, winner: winner };
+  }
+
+  function fmt(n, digits) {
+    return n === null || n === undefined ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var state = {
+    data: null,
+    tab: 'ranking',
+    q: '',
+    platform: '',
+    order: 'asc',
+    sort: { consoles: { key: 'total', dir: -1 }, viewers: { key: 'played', dir: -1 } }
+  };
+
+  var $view = document.getElementById('view');
+  var $summary = document.getElementById('summary');
+  var $drips = document.getElementById('drips');
+  var $tabs = document.getElementById('tabs');
+  var $foot = document.getElementById('foot');
+
+  function normalizeData(data) {
+    var games = (data && data.games) || [];
+    games.forEach(function (g) {
+      if (typeof g.score !== 'number' || !isFinite(g.score)) g.score = null;
+      if (g.viewer === undefined || g.viewer === '') g.viewer = null;
+      g.done = !!g.done;
+    });
+    return { games: games, updatedAt: data && data.updatedAt };
+  }
+
+  function load() {
+    $foot.textContent = '';
+    google.script.run
+      .withSuccessHandler(function (data) { state.data = normalizeData(data); renderAll(); })
+      .withFailureHandler(function (err) { showError(err && err.message ? err.message : String(err)); })
+      .getData();
+  }
+
+  function showError(message) {
+    $summary.textContent = 'Não foi possível carregar a lista.';
+    $view.innerHTML = '<div class="notice"><p>' + esc(message) + '</p>' +
+      '<button type="button" id="retry">Tentar de novo</button></div>';
+    document.getElementById('retry').addEventListener('click', function () {
+      $summary.textContent = 'Carregando a lista…';
+      load();
+    });
+  }
+
+  function renderHeader() {
+    var s = summarize(state.data.games);
+    $summary.innerHTML =
+      '<strong>' + s.played + '</strong> de ' + s.total + ' jogos já passaram pelo chorume';
+
+    var bins = histogram(state.data.games, MAX_SCORE);
+    var top = Math.max.apply(null, bins) || 1;
+    var cols = bins.map(function (n, i) {
+      var label = fmt((i + 1) / 2, 1) + ': ' + plural(n, 'jogo', 'jogos');
+      return '<div class="drip" title="' + label + '"><i style="--len:' + (n / top).toFixed(3) + ';--i:' + i + '"></i></div>';
+    }).join('');
+
+    var summaryText = bins.map(function (n, i) { return n ? fmt((i + 1) / 2, 1) + ' (' + n + ')' : ''; })
+      .filter(Boolean).join(', ');
+
+    var axis = bins.map(function (n, i) {
+      var score = (i + 1) / 2;
+      var labeled = i === 0 || (i + 1) % 5 === 0;
+      return labeled
+        ? '<span class="tick">' + String(score).replace('.', ',') + '</span>'
+        : '<span></span>';
+    }).join('');
+
+    $drips.hidden = false;
+    $drips.style.setProperty('--n', bins.length);
+    $drips.innerHTML =
+      '<div role="img" aria-label="Quantidade de jogos por nota: ' + summaryText + '">' +
+      '<div class="drips__cols">' + cols + '</div>' +
+      '<div class="drips__axis" aria-hidden="true">' + axis + '</div>' +
+      '</div>';
+  }
+
+  function sideWin(key, tone, title, body) {
+    return '<section class="sw sw--' + key + ' tone-' + tone + '"><div class="sw__bar"><span>' + title +
+      '</span><i></i></div><div class="sw__body">' + body + '</div></section>';
+  }
+
+  function miniBars(rows, valueOf, label) {
+    var max = Math.max.apply(null, rows.map(valueOf).concat([0.0001]));
+    return rows.map(function (r) {
+      return '<div class="mb"><span class="mb__n">' + esc(r.name) + '</span><b class="mb__v">' + label(r) +
+        '</b><i style="--w:' + (valueOf(r) / max * 100).toFixed(1) + '%"></i></div>';
+    }).join('');
+  }
+
+  function miniHist(bins) {
+    var top = Math.max.apply(null, bins.concat([1]));
+    return '<div class="mh">' + bins.map(function (n) {
+      return '<i style="--h:' + (n / top * 100).toFixed(1) + '%"></i>';
+    }).join('') + '</div>';
+  }
+
+  function terminal(lines) {
+    return '<pre class="term">' + lines.map(esc).join('\n') + '<span class="term__cur">_</span></pre>';
+  }
+
+  function renderSides() {
+    var $sides = document.getElementById('sides');
+    var games = state.data.games;
+    var s = summarize(games);
+    var x = sideStats(games, BAD_SCORE);
+    var bins = histogram(games, MAX_SCORE);
+    var pctPlayed = s.total ? Math.round(s.played / s.total * 100) : 0;
+    var bandNames = ['até ' + fmt(BAD_SCORE, 1), fmt(BAD_SCORE + 0.5, 1) + ' a 4', '4,5 a 6', 'acima de 6'];
+    var bandRows = x.bands.map(function (n, i) { return { name: bandNames[i], n: n }; });
+    var count = function (r) { return r.total; };
+    var avg = function (r) { return fmt(r.avg, 1); };
+
+    var made = [];
+    function W(key, tone, title, body) {
+      made.push({ tone: tone, title: title, body: body });
+      return sideWin(key, tone, title, body);
+    }
+
+    var html = [
+      W('a', 'l', 'consoles.dat', '<p class="sw__h">Consoles com mais jogos</p>' +
+        miniBars(x.consolesByTotal.slice(0, 6), function (r) { return r.total; }, count)),
+
+      W('b', 'y', 'chorume.rpt', '<p class="sw__h sw__h--c">RELATÓRIO DO CHORUME</p><dl class="rpt">' +
+        '<dt>Avaliados</dt><dd>' + s.played + '</dd>' +
+        '<dt>Na fila</dt><dd>' + s.queue + '</dd>' +
+        '<dt>Média</dt><dd>' + fmt(s.avg, 2) + '</dd>' +
+        '<dt>Melhor nota</dt><dd>' + (x.best ? fmt(x.best.score, 1) : '–') + '</dd>' +
+        '<dt>Pior nota</dt><dd>' + (x.worst[0] ? fmt(x.worst[0].score, 1) : '–') + '</dd>' +
+        '<dt>Zerados</dt><dd>' + x.zerados + '</dd></dl>' +
+        (x.worst[0] ? '<p class="sw__act">&gt; Pior jogo: ' + esc(x.worst[0].title) + '</p>' : '')),
+
+      W('c', 'p', 'cmd.exe', terminal(['> abrindo planilha', '> ' + s.total + ' jogos', '> media ' + fmt(s.avg, 2),
+        '> fila: ' + s.queue, '> pronto'])),
+
+      W('d', 'l', 'fila.pie', '<p class="sw__h">Já avaliados</p><div class="pie" style="--p:' + pctPlayed +
+        '%"><b>' + pctPlayed + '%</b></div><p class="sw__cap">' + s.played + ' de ' + s.total + ' jogos</p>'),
+
+      W('e', 'y', 'faixas.bnd', '<p class="sw__h">Jogos por faixa de nota</p>' +
+        miniBars(bandRows, function (r) { return r.n; }, function (r) { return r.n; })),
+
+      W('f', 'p', 'notas.img', '<p class="sw__h">Notas</p>' + miniHist(bins)),
+
+      W('g', 'p', 'ruins.log', '<p class="sw__h">Quem mais indicou jogo ruim</p>' +
+        miniBars(x.badViewers.slice(0, 5), count, count) +
+        '<p class="sw__cap">jogos com nota até ' + fmt(BAD_SCORE, 1) + '</p>'),
+
+      W('h', 'l', 'media.cfg', '<p class="sw__h">Menor média por console</p>' +
+        miniBars(x.consolesWorst.slice(0, 5), function (r) { return r.avg; }, avg)),
+
+      W('i', 'y', 'viewers.top', '<p class="sw__h">Quem mais indicou</p>' +
+        miniBars(x.viewersByTotal.slice(0, 5), count, count)),
+
+      W('j', 'l', 'piores.lst', '<p class="sw__h">Piores notas</p><ol class="wl">' +
+        x.worst.slice(0, 4).map(function (g) {
+          return '<li><span>' + esc(g.title) + '</span><b>' + fmt(g.score, 1) + '</b></li>';
+        }).join('') + '</ol>'),
+
+      W('k', 'p', 'gotas.exe', '<p class="sw__h">Notas</p>' + miniHist(bins)),
+
+      W('l', 'y', 'ticker.log', terminal(['> ' + plural(s.played, 'jogo', 'jogos'), '> ' + plural(x.zerados, 'zerado', 'zerados'),
+        '> ' + pctPlayed + '% avaliado'])),
+
+      W('m', 'l', 'faixas.far', '<p class="sw__h">Jogos por faixa</p>' +
+        miniBars(bandRows, function (r) { return r.n; }, function (r) { return r.n; })),
+
+      W('n', 'p', 'consoles.far', '<p class="sw__h">Jogos por console</p>' +
+        miniBars(x.consolesByTotal.slice(0, 4), function (r) { return r.total; }, count))
+    ];
+
+    var seed = 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    var n = 0;
+    ['L', 'R'].forEach(function (side, si) {
+      var y = (si ? 104 : 96) + rnd() * 10;
+      while (y < 800) {
+        var it = made[n++ % 12];
+        var w = 7.2 + rnd() * 2.4;
+        var g = 0.1 + rnd() * 1.2;
+        html.push(sideWin('x', it.tone, it.title, it.body)
+          .replace('class="sw sw--x', 'class="sw sw--x sw--' + side)
+          .replace('<section ', '<section style="--y:' + y.toFixed(1) + 'rem;--w:' + w.toFixed(1) + 'rem;--g:' + g.toFixed(1) + 'rem" '));
+        y += 22 + rnd() * 16;
+      }
+    });
+    $sides.innerHTML = html.join('');
+  }
+
+  function renderFooter() {
+    $foot.innerHTML = '<button type="button" class="link" id="reload">Atualizar</button>';
+    document.getElementById('reload').addEventListener('click', load);
+  }
+
+  var WINDOW_TITLES = {
+    ranking: 'ranking.lst', consoles: 'consoles.dat', viewers: 'viewers.dat',
+    zerados: 'zerados.lst', fila: 'fila.txt', sorteio: 'sorteio.exe'
+  };
+
+  function renderTabs() {
+    Array.prototype.forEach.call($tabs.querySelectorAll('button'), function (b) {
+      if (b.dataset.tab === state.tab) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    document.getElementById('wintitle').textContent = WINDOW_TITLES[state.tab];
+  }
+
+  function setTab(tab) {
+    state.tab = tab;
+    if (history.replaceState) { try { history.replaceState(null, '', '#' + tab); } catch (e) {} }
+    renderTabs();
+    renderView();
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderSides();
+    renderFooter();
+    renderTabs();
+    renderView();
+  }
+
+  function renderView() {
+    if (!state.data) return;
+    if (state.tab === 'ranking' || state.tab === 'zerados' || state.tab === 'fila') renderListView();
+    else if (state.tab === 'consoles') renderTable('consoles');
+    else if (state.tab === 'viewers') renderTable('viewers');
+    else renderRoulette();
+  }
+
+  function consoleOptions() {
+    var names = groupStats(state.data.games, 'console').map(function (c) { return c.name; })
+      .sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+    return '<option value="">Todos</option>' + names.map(function (n) {
+      return '<option value="' + esc(n) + '"' + (n === state.platform ? ' selected' : '') + '>' + esc(n) + '</option>';
+    }).join('');
+  }
+
+  function renderListView() {
+    var isRanking = state.tab === 'ranking';
+    $view.innerHTML =
+      '<div class="filters">' +
+        '<label class="field field--grow">Buscar jogo ou viewer' +
+          '<input type="search" id="q" value="' + esc(state.q) + '" autocomplete="off"></label>' +
+        '<label class="field">Console<select id="platform">' + consoleOptions() + '</select></label>' +
+        (isRanking
+          ? '<label class="field">Ordem<select id="order">' +
+              '<option value="asc"' + (state.order === 'asc' ? ' selected' : '') + '>Pior nota primeiro</option>' +
+              '<option value="desc"' + (state.order === 'desc' ? ' selected' : '') + '>Melhor nota primeiro</option>' +
+            '</select></label>'
+          : '') +
+      '</div><div id="results"></div>';
+
+    document.getElementById('q').addEventListener('input', function (e) { state.q = e.target.value; renderResults(); });
+    document.getElementById('platform').addEventListener('change', function (e) { state.platform = e.target.value; renderResults(); });
+    if (isRanking) document.getElementById('order').addEventListener('change', function (e) { state.order = e.target.value; renderResults(); });
+
+    renderResults();
+  }
+
+  function matches(g) {
+    if (state.platform && g.console !== state.platform) return false;
+    var q = norm(state.q);
+    return !q || norm(g.title).indexOf(q) !== -1 || norm(g.viewer).indexOf(q) !== -1;
+  }
+
+  function gameInfo(g, hideBadge) {
+    return '<div class="title">' + esc(g.title) + (g.done && !hideBadge ? '<span class="badge">zerado</span>' : '') + '</div>' +
+      '<div class="meta"><span class="chip">' + esc(g.console) + '</span>' +
+      (g.viewer ? '<button type="button" class="link" data-viewer="' + esc(g.viewer) + '">' + esc(g.viewer) + '</button>' : '<span>sem viewer</span>') +
+      '</div>';
+  }
+
+  function renderResults() {
+    var $r = document.getElementById('results');
+    var games = state.data.games;
+    var html;
+
+    if (state.tab === 'ranking') {
+      var scored = games.filter(function (g) { return g.score !== null; });
+      var list = sortGames(scored.filter(matches), state.order);
+      html = '<p class="count" aria-live="polite">' + plural(list.length, 'jogo', 'jogos') + '</p>';
+      if (!list.length) {
+        html += '<div class="notice">Nenhum jogo encontrado. Limpe a busca ou escolha outro console.</div>';
+      } else {
+        html += '<ol class="list">' + list.map(function (g) {
+          return '<li class="row"><span class="pos">' + rankOf(g, scored, state.order) + '</span><div>' + gameInfo(g) + '</div>' +
+            '<div class="score"><span class="score__num">' + fmt(g.score, 1) + '</span>' +
+            '<span class="score__bar" aria-hidden="true"><i style="width:' + Math.min(g.score / MAX_SCORE * 100, 100) + '%"></i></span></div></li>';
+        }).join('') + '</ol>';
+      }
+    } else if (state.tab === 'zerados') {
+      var done = games.filter(function (g) { return g.done && matches(g); })
+        .sort(function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); });
+      html = '<p class="count" aria-live="polite">' + plural(done.length, 'jogo zerado', 'jogos zerados') + '</p>';
+      if (!done.length) {
+        html += '<div class="notice">Nenhum jogo zerado com esses filtros.</div>';
+      } else {
+        html += '<ul class="list">' + done.map(function (g) {
+          return '<li class="row row--plain"><div>' + gameInfo(g, true) + '</div>' +
+            '<div class="score">' + (g.score === null
+              ? '<span class="score__num score--none">sem nota</span>'
+              : '<span class="score__num">' + fmt(g.score, 1) + '</span>') + '</div></li>';
+        }).join('') + '</ul>';
+      }
+    } else {
+      var queue = games.filter(function (g) { return g.score === null && matches(g); });
+      html = '<p class="count" aria-live="polite">' + plural(queue.length, 'jogo', 'jogos') + ' na fila</p>';
+      if (!queue.length) {
+        html += '<div class="notice">Nenhum jogo na fila com esses filtros.</div>';
+      } else {
+        var byConsole = {};
+        queue.forEach(function (g) { (byConsole[g.console] = byConsole[g.console] || []).push(g); });
+        html += Object.keys(byConsole).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); }).map(function (c) {
+          return '<section class="group"><h2>' + esc(c) + '</h2><ul class="list">' +
+            byConsole[c].sort(function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); }).map(function (g) {
+              return '<li class="row row--plain"><div><div class="title">' + esc(g.title) + '</div>' +
+                '<div class="meta">' + (g.viewer ? '<button type="button" class="link" data-viewer="' + esc(g.viewer) + '">' + esc(g.viewer) + '</button>' : '<span>sem viewer</span>') +
+                '</div></div></li>';
+            }).join('') + '</ul></section>';
+        }).join('');
+      }
+    }
+
+    $r.innerHTML = html;
+  }
+
+  var TABLE_COLUMNS = {
+    consoles: [['name', 'Console'], ['avg', 'Média'], ['played', 'Jogados'], ['total', 'Total']],
+    viewers:  [['name', 'Viewer'],  ['avg', 'Média'], ['played', 'Jogados'], ['total', 'Enviados']]
+  };
+
+  function renderTable(which) {
+    var field = which === 'consoles' ? 'console' : 'viewer';
+    var rows = groupStats(state.data.games, field);
+    var cfg = state.sort[which];
+
+    rows.sort(function (a, b) {
+      var av = a[cfg.key], bv = b[cfg.key];
+      if (av === null && bv === null) return a.name.localeCompare(b.name, 'pt-BR');
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      var d = cfg.key === 'name' ? av.localeCompare(bv, 'pt-BR') : av - bv;
+      return d ? d * cfg.dir : a.name.localeCompare(b.name, 'pt-BR');
+    });
+
+    var head = TABLE_COLUMNS[which].map(function (c) {
+      var sorted = cfg.key === c[0];
+      return '<th scope="col" aria-sort="' + (sorted ? (cfg.dir === 1 ? 'ascending' : 'descending') : 'none') + '">' +
+        '<button type="button" data-sort="' + c[0] + '">' + c[1] + '</button></th>';
+    }).join('');
+
+    var body = rows.map(function (r) {
+      var nameCell = which === 'viewers'
+        ? '<button type="button" class="link" data-viewer="' + esc(r.name) + '">' + esc(r.name) + '</button>'
+        : '<button type="button" class="link" data-console="' + esc(r.name) + '">' + esc(r.name) + '</button>';
+      return '<tr><td>' + nameCell + '</td><td>' + fmt(r.avg, 2) + '</td><td>' + r.played + '</td><td>' + r.total + '</td></tr>';
+    }).join('');
+
+    $view.innerHTML =
+      '<p class="count">' + plural(rows.length, which === 'consoles' ? 'console' : 'viewer', which === 'consoles' ? 'consoles' : 'viewers') + '</p>' +
+      '<div class="table-wrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  var SPIN_MS = 5200;
+  var SPIN_ROWS = 42;
+  var roulette = { busy: false, platform: '', history: [] };
+
+  function queueGames() {
+    return state.data.games.filter(function (g) {
+      return g.score === null && (!roulette.platform || g.console === roulette.platform);
+    });
+  }
+
+  function reelRow(g) {
+    return '<div class="reel__row"><span class="reel__title">' + esc(g.title) + '</span>' +
+      '<span class="reel__meta">' + esc(g.console) + '</span></div>';
+  }
+
+  function renderRoulette() {
+    roulette.busy = false;
+    var queueAll = state.data.games.filter(function (g) { return g.score === null; });
+    var names = {};
+    queueAll.forEach(function (g) { if (g.console) names[g.console] = true; });
+    var options = '<option value="">Todos</option>' + Object.keys(names)
+      .sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); })
+      .map(function (n) {
+        return '<option value="' + esc(n) + '"' + (n === roulette.platform ? ' selected' : '') + '>' + esc(n) + '</option>';
+      }).join('');
+
+    $view.innerHTML =
+      '<section class="roulette">' +
+        '<div class="roulette__top">' +
+          '<label class="field"><span>Console</span><select id="rplatform">' + options + '</select></label>' +
+          '<p class="count" id="rcount"></p>' +
+        '</div>' +
+        '<div class="reel" id="reel" aria-hidden="true">' +
+          '<div class="reel__strip" id="strip">' +
+            '<div class="reel__row"><span class="reel__title">?</span></div>' +
+            '<div class="reel__row"><span class="reel__title">? ? ?</span></div>' +
+            '<div class="reel__row"><span class="reel__title">?</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="spin" id="spin">SORTEAR</button>' +
+        '<div class="result" id="rresult" role="status" aria-live="polite"></div>' +
+        '<div id="rhistory"></div>' +
+      '</section>';
+
+    document.getElementById('spin').addEventListener('click', spinRoulette);
+    document.getElementById('rplatform').addEventListener('change', function (e) {
+      roulette.platform = e.target.value;
+      updateRouletteCount();
+    });
+    updateRouletteCount();
+    renderRouletteHistory();
+  }
+
+  function updateRouletteCount() {
+    var n = queueGames().length;
+    document.getElementById('rcount').textContent = plural(n, 'jogo', 'jogos') + ' na fila';
+    document.getElementById('spin').disabled = !n;
+    if (!n) document.getElementById('rresult').innerHTML = '<p class="result__none">Nenhum jogo na fila' +
+      (roulette.platform ? ' para esse console' : '') + '.</p>';
+    else document.getElementById('rresult').innerHTML = '';
+  }
+
+  function renderRouletteHistory() {
+    var $h = document.getElementById('rhistory');
+    if (!$h) return;
+    $h.innerHTML = roulette.history.length
+      ? '<h3 class="history__h">Já saíram</h3><ol class="history">' + roulette.history.map(function (g) {
+          return '<li><span>' + esc(g.title) + '</span><span class="chip">' + esc(g.console) + '</span></li>';
+        }).join('') + '</ol>'
+      : '';
+  }
+
+  function spinRoulette() {
+    if (roulette.busy) return;
+    var pool = queueGames();
+    if (!pool.length) return;
+    roulette.busy = true;
+
+    var reel = buildReel(pool, SPIN_ROWS, Math.random);
+    var $strip = document.getElementById('strip');
+    var $reel = document.getElementById('reel');
+    var $btn = document.getElementById('spin');
+    var $result = document.getElementById('rresult');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    $btn.disabled = true;
+    $btn.textContent = 'SORTEANDO…';
+    $result.innerHTML = '';
+    $reel.classList.remove('reel--landed');
+    $reel.classList.add('reel--spin');
+    $strip.style.transition = 'none';
+    $strip.style.transform = 'translateY(0)';
+    $strip.innerHTML = reel.items.map(reelRow).join('');
+    var rowH = $strip.firstElementChild.getBoundingClientRect().height;
+    void $strip.offsetHeight;
+
+    var finished = false;
+    function land() {
+      if (finished) return;
+      finished = true;
+      if (!document.body.contains($strip)) return;
+      roulette.busy = false;
+      $reel.classList.remove('reel--spin');
+      $reel.classList.add('reel--landed');
+      $strip.children[reel.index].classList.add('reel__row--win');
+      var g = reel.winner;
+      $result.innerHTML = '<p class="result__label">Caiu:</p>' +
+        '<p class="result__title">' + esc(g.title) + '</p>' +
+        '<p class="result__meta"><span class="chip">' + esc(g.console) + '</span>' +
+        (g.viewer ? 'indicado por <strong>' + esc(g.viewer) + '</strong>' : '') + '</p>';
+      roulette.history.unshift(g);
+      roulette.history = roulette.history.slice(0, 6);
+      renderRouletteHistory();
+      $btn.textContent = 'SORTEAR DE NOVO';
+      $btn.disabled = false;
+      $btn.focus();
+    }
+
+    var offset = -(reel.index - 1) * rowH;
+    if (reduce) {
+      $strip.style.transform = 'translateY(' + offset + 'px)';
+      land();
+      return;
+    }
+    $strip.style.transition = 'transform ' + SPIN_MS + 'ms cubic-bezier(0.35, 0.3, 0.3, 1)';
+    $strip.style.transform = 'translateY(' + offset + 'px)';
+    $strip.addEventListener('transitionend', land, { once: true });
+    setTimeout(land, SPIN_MS + 400);
+  }
+
+  $tabs.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tab]');
+    if (b) setTab(b.dataset.tab);
+  });
+
+  $view.addEventListener('click', function (e) {
+    var sortBtn = e.target.closest('button[data-sort]');
+    if (sortBtn) {
+      var cfg = state.sort[state.tab];
+      var key = sortBtn.dataset.sort;
+      cfg.dir = cfg.key === key ? -cfg.dir : (key === 'name' ? 1 : -1);
+      cfg.key = key;
+      renderTable(state.tab);
+      return;
+    }
+    var viewerBtn = e.target.closest('button[data-viewer]');
+    var consoleBtn = e.target.closest('button[data-console]');
+    if (!viewerBtn && !consoleBtn) return;
+
+    state.q = viewerBtn ? viewerBtn.dataset.viewer : '';
+    state.platform = consoleBtn ? consoleBtn.dataset.console : '';
+    if (state.tab === 'ranking' || state.tab === 'zerados' || state.tab === 'fila') renderListView();
+    else setTab('ranking');
+  });
+
+  var initial = (location.hash || '').replace('#', '');
+  if (['ranking', 'consoles', 'viewers', 'zerados', 'fila', 'sorteio'].indexOf(initial) !== -1) state.tab = initial;
+
+  load();
+</script>

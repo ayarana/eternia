@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retrô Chorume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Qwitcher+Grypen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+  <?!= include('wallpaper') ?>
+  <?!= include('styles') ?>
+</head>
+<body>
+  <div id="sides" class="sides" aria-hidden="true"></div>
+
+  <div class="page">
+    <header class="masthead">
+      <h1 class="logo" data-text="Retrô Chorume"><span data-text="Retrô Chorume">Retrô Chorume</span></h1>
+
+      <section class="win win--meter" aria-label="Resumo da lista">
+        <div class="win__bar">
+          <span class="win__title">chorumometro.exe</span>
+          <span class="win__btns" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+        <div class="win__body">
+          <p id="summary" class="summary">Carregando a lista…</p>
+          <figure id="drips" class="drips" hidden></figure>
+        </div>
+      </section>
+    </header>
+
+    <nav id="tabs" class="tabs" aria-label="Seções">
+      <button type="button" data-tab="ranking">Ranking</button>
+      <button type="button" data-tab="consoles">Consoles</button>
+      <button type="button" data-tab="viewers">Viewers</button>
+      <button type="button" data-tab="zerados">Zerados</button>
+      <button type="button" data-tab="fila">Fila</button>
+      <button type="button" data-tab="sorteio">Sorteio</button>
+    </nav>
+
+    <section class="win win--main">
+      <div class="win__bar">
+        <span class="win__title" id="wintitle">ranking.lst</span>
+        <span class="win__btns" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <main id="view" class="win__body view"></main>
+    </section>
+
+    <footer id="foot" class="foot"></footer>
+  </div>
+
+  <?!= include('app') ?>
+</body>
+</html>
