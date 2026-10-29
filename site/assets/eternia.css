@@ -765,7 +765,11 @@ body:not(.is-in) .hero__ring, body:not(.is-in) .spark { opacity: 0; }
 .yt iframe { display: block; width: 200px; height: 200px; border: 0; }
 .pn--signal.is-yt { min-width: 232px; }
 .pn--signal.is-yt #bars, .pn--signal.is-yt .np { display: none; }
-@media (min-width: 1000px) { .pn--signal.is-yt ~ .pn--log { top: max(25.5rem, 52vh); } }
+.ytctl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem; width: 200px; margin: 0 auto; }
+.ytctl button { flex: none; width: 2.3rem; height: 1.8rem; padding: 0; border: 2px solid var(--pink); background: #000; color: var(--pink); font: 500 0.7rem/1 var(--display); letter-spacing: -0.1em; cursor: pointer; }
+.ytctl button:hover, .ytctl button:focus-visible { background: var(--pink); color: #000; }
+.ytctl__name { order: 3; flex: 0 0 100%; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); font: 400 1rem/1 var(--body); }
+@media (min-width: 1000px) { .pn--signal.is-yt ~ .pn--log { top: max(28rem, 56vh); } }
 
 .cta--zerados { --edge: linear-gradient(135deg, var(--lilac), var(--pink)); --bar: var(--lilac); --ink: var(--lilac); --glow: rgba(169, 156, 246, 0.5); --delay: 1.5s; }
 .cta--zerados { clip-path: polygon(0 10px, 10px 0, calc(100% - 10px) 0px, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px)); }
