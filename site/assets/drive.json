@@ -1,5 +1,4 @@
 {
-  "_ajuda": "Cole aqui os IDs dos arquivos do Google Drive (compartilhados como 'Qualquer pessoa com o link'). O ID é o trecho entre /d/ e /view no link do arquivo. O que ficar vazio usa a cópia que está em assets/. 'youtube': ID de um vídeo do YouTube (o trecho depois de v=). Se preenchido, a música toca pelo player do YouTube, visível na janela sinal.wav, no lugar do MP3 local.",
   "esqueleto": "1Uboa-g1IsaWBQ3NIqk-OiAGQVfZbaJqR",
   "mascote": "1zsq4rwW_GGKAKpvM---sazp5Rt_WaLFo",
   "aleatorios": [
