@@ -35,7 +35,9 @@ let app = read('index.html').replace(/<\?!=\s*include\('([\w-]+)'\)\s*\?>/g, (_,
 });
 app = app
   .replace(/\s*<base target="_top">/, '')
-  .replace('</head>', `  <link rel="stylesheet" href="/assets/nav.css">\n` +
+  .replace('</head>', `  <link rel="icon" type="image/png" href="/assets/favicon.png">\n` +
+    `  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">\n` +
+    `  <link rel="stylesheet" href="/assets/nav.css">\n` +
     (apiUrl ? `  <script>window.RETRO_API_URL = ${JSON.stringify(apiUrl)};</script>\n` : '') + '</head>')
   .replace(/<body>/, '<body>\n  ' + nav('/retro-chorume/'));
 if (app.includes('<?')) fail('sobrou um trecho <? ?> do Apps Script na página do app.');
