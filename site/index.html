@@ -56,6 +56,11 @@
           <button type="button" id="ytprev" aria-label="Música anterior">&#9664;&#9664;</button>
           <span class="ytctl__name" id="ytname" aria-live="polite"></span>
           <button type="button" id="ytnext" aria-label="Próxima música">&#9654;&#9654;</button>
+          <div class="ytvol">
+            <label for="ytvol">vol</label>
+            <input type="range" id="ytvol" min="0" max="100" step="1" value="85">
+            <output id="ytvolv" for="ytvol">85</output>
+          </div>
         </div>
         <canvas id="bars" width="120" height="40" aria-hidden="true"></canvas>
         <p class="np"><span class="np__state" id="npstate">em espera</span><br>the story begins (intro)<br><small>moderator</small></p>
@@ -117,10 +122,10 @@
     <img class="mascot reveal" alt="" aria-hidden="true" width="210" height="150">
   </main>
 
-  <footer class="foot reveal" aria-hidden="true">
-    <span>SYSTEM STATUS: <b>ESTÁVEL</b></span>
-    <span class="foot__mid">BUT YOU GOT THIS <b>♥</b></span>
-    <span class="foot__code"><i class="barcode"></i>APROVEITE A MÚSICA</span>
+  <footer class="foot reveal">
+    <span aria-hidden="true">SYSTEM STATUS: <b>ESTÁVEL</b></span>
+    <span class="foot__mid">source code: <a href="https://github.com/ayarana/eternia" target="_blank" rel="noopener noreferrer">github</a> <b aria-hidden="true">♥</b></span>
+    <span class="foot__code" aria-hidden="true"><i class="barcode"></i>APROVEITE A MÚSICA</span>
   </footer>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-label="Entrar em Etérnia" hidden>

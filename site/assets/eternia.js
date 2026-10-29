@@ -291,7 +291,22 @@
   }
 
   var ytId = '', yt = null, ytState = -1, ytPanel = document.querySelector('.pn--signal');
-  var ytList = '', ytPhase = 'intro', ytErrors = 0, ytIds = null;
+  var ytList = '', ytPhase = 'intro', ytErrors = 0, ytIds = null, ytVol = 85;
+  try {
+    var savedVol = localStorage.getItem('eternia:vol');
+    if (savedVol !== null && isFinite(Number(savedVol))) ytVol = Math.max(0, Math.min(100, Number(savedVol)));
+  } catch (e) {}
+  $('ytvol').value = ytVol;
+  $('ytvolv').textContent = ytVol;
+  $('ytvol').addEventListener('input', function () {
+    ytVol = Number(this.value);
+    $('ytvolv').textContent = ytVol;
+    if (yt && yt.setVolume) {
+      yt.setVolume(ytVol);
+      if (ytVol > 0 && yt.isMuted && yt.isMuted()) yt.unMute();
+    }
+    try { localStorage.setItem('eternia:vol', String(ytVol)); } catch (e) {}
+  });
   function isPaused() { return ytId ? !(yt && (ytState === 1 || ytState === 3)) : music.paused; }
 
   music.volume = 0.85;
@@ -377,7 +392,9 @@
 
   function startYouTube(id) {
     ytId = id;
-    if (ytList) { $('ytctl').hidden = false; loadIds(); }
+    $('ytctl').hidden = false;
+    if (ytList) loadIds();
+    else { $('ytprev').hidden = true; $('ytnext').hidden = true; $('ytname').hidden = true; }
     ytPanel.classList.add('is-yt');
     $('ytwrap').hidden = false;
     var done = false, fail = setTimeout(function () { if (!done) { done = true; arrive(); } }, 7000);
@@ -389,13 +406,13 @@
           : { controls: 1, playsinline: 1, rel: 0, loop: 1, playlist: id, iv_load_policy: 3, origin: location.origin },
         events: {
           onReady: function () {
-            yt.setVolume(85); yt.playVideo();
+            yt.setVolume(ytVol); yt.playVideo();
             setTimeout(function () { if (done) return; done = true; clearTimeout(fail); if (ytState === 1) arrive(); else showGate(); }, 2500);
           },
           onStateChange: function (e) {
             ytState = e.data;
             if (e.data === 0 && ytList && ytPhase === 'intro') ytPlaylist();
-            if (e.data === 1) { ytErrors = 0; ytTitle(); }
+            if (e.data === 1) { ytErrors = 0; ytTitle(); yt.setVolume(ytVol); }
             setUI();
           },
           onError: function (e) {
