@@ -1,4 +1,15 @@
 [
-  { "label": "Etérnia", "href": "/" },
-  { "label": "Retrô Chorume", "href": "/retro-chorume/" }
+  {
+    "label": "Etérnia",
+    "href": "/"
+  },
+  {
+    "label": "Jogos zerados",
+    "href": "/jogos-zerados/",
+    "only": "zerados"
+  },
+  {
+    "label": "Retrô Chorume",
+    "href": "/retro-chorume/"
+  }
 ]

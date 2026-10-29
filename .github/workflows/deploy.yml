@@ -14,9 +14,12 @@ permissions:
 
 jobs:
   apps-script:
-    name: Apps Script
+    name: Apps Script - Retrô Chorume
     runs-on: ubuntu-latest
     if: ${{ vars.DEPLOYMENT_ID != '' }}
+    defaults:
+      run:
+        working-directory: retro-chorume
     steps:
       - uses: actions/checkout@v4
 
@@ -42,10 +45,42 @@ jobs:
           DEPLOYMENT_ID: ${{ vars.DEPLOYMENT_ID }}
         run: clasp update-deployment "$DEPLOYMENT_ID" -d "$GITHUB_SHA"
 
+  apps-script-zerados:
+    name: Apps Script - Jogos Zerados
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOYMENT_ID_ZERADOS != '' }}
+    defaults:
+      run:
+        working-directory: jogos-zerados
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar clasp
+        run: npm install -g @google/clasp
+
+      - name: Credenciais do clasp
+        env:
+          CLASPRC: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          umask 077
+          printf '%s' "$CLASPRC" > ~/.clasprc.json
+
+      - name: Enviar código
+        run: clasp push --force
+
+      - name: Atualizar a implantação
+        env:
+          DEPLOYMENT_ID: ${{ vars.DEPLOYMENT_ID_ZERADOS }}
+        run: clasp update-deployment "$DEPLOYMENT_ID" -d "$GITHUB_SHA"
+
   site:
     name: Site no Netlify
-    needs: apps-script
-    if: ${{ !cancelled() && (needs.apps-script.result == 'success' || needs.apps-script.result == 'skipped') }}
+    needs: [apps-script, apps-script-zerados]
+    if: ${{ !cancelled() && (needs.apps-script.result == 'success' || needs.apps-script.result == 'skipped') && (needs.apps-script-zerados.result == 'success' || needs.apps-script-zerados.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +92,7 @@ jobs:
       - name: Montar o site
         env:
           APPS_SCRIPT_URL: https://script.google.com/macros/s/${{ vars.DEPLOYMENT_ID }}/exec
+          APPS_SCRIPT_ZERADOS_URL: ${{ vars.DEPLOYMENT_ID_ZERADOS != '' && format('https://script.google.com/macros/s/{0}/exec', vars.DEPLOYMENT_ID_ZERADOS) || '' }}
         run: node scripts/build-site.mjs
 
       - name: Publicar no Netlify

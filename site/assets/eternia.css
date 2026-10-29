@@ -766,3 +766,8 @@ body:not(.is-in) .hero__ring, body:not(.is-in) .spark { opacity: 0; }
 .pn--signal.is-yt { min-width: 232px; }
 .pn--signal.is-yt #bars, .pn--signal.is-yt .np { display: none; }
 @media (min-width: 1000px) { .pn--signal.is-yt ~ .pn--log { top: max(25.5rem, 52vh); } }
+
+.cta--zerados { --edge: linear-gradient(135deg, var(--lilac), var(--pink)); --bar: var(--lilac); --ink: var(--lilac); --glow: rgba(169, 156, 246, 0.5); --delay: 1.5s; }
+.cta--zerados { clip-path: polygon(0 10px, 10px 0, calc(100% - 10px) 0px, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px)); }
+.cta--zerados::before { clip-path: polygon(0 8.8px, 8.8px 0, calc(100% - 8.8px) 0px, 100% 8.8px, 100% calc(100% - 8.8px), calc(100% - 8.8px) 100%, 8.8px 100%, 0 calc(100% - 8.8px)); }
+.cta--zerados::after { background: repeating-linear-gradient(65deg, var(--ink) 0 2px, transparent 2px 5px) left 22px bottom 6px / 34px 8px no-repeat; }
