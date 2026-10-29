@@ -578,6 +578,8 @@
     background: repeating-linear-gradient(90deg, var(--pink) 0 4px, transparent 4px 6px);
   }
   .score--none { color: var(--text-soft); }
+  .score--pending { color: var(--yellow); font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .row--pending .title { color: var(--text-soft); }
 
   .table-wrap {
     overflow-x: auto;
@@ -738,14 +740,19 @@
   .result__meta strong { color: var(--text); font-weight: 400; }
   .result__none { margin: 0; color: var(--text-soft); }
 
-  .history__h { margin: 1.6rem 0 0.4rem; color: var(--lilac); font: 500 1rem/1.2 var(--font-display); }
-  .history { margin: 0; padding: 0; list-style: none; }
-  .history li {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem;
-    padding: 0.25rem 0;
-    border-bottom: 1px dotted var(--lilac-dim);
+  .left { margin-top: 1.8rem; padding-top: 0.9rem; border-top: 1px dotted var(--lilac-dim); }
+  .left__h { margin: 0 0 0.5rem; color: var(--lilac); font: 500 1rem/1.2 var(--font-display); }
+  .left__list { margin: 0; padding: 0; list-style: none; }
+  .left__list li {
+    display: grid; grid-template-columns: minmax(6rem, 10rem) 1fr 2.2rem; align-items: center; gap: 0.7rem;
+    padding: 0.2rem 0;
     color: var(--text-soft);
   }
+  .left__list li.is-sel { color: var(--yellow); }
+  .left__bar { display: block; height: 0.55rem; background: rgba(169, 156, 246, 0.15); }
+  .left__bar i { display: block; height: 100%; background: var(--lilac); }
+  .left__list li.is-sel .left__bar i { background: var(--yellow); }
+  .left__n { text-align: right; }
 
   @media (max-width: 560px) {
     .roulette { --row: 3.8rem; }

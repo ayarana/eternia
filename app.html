@@ -127,6 +127,7 @@
     q: '',
     platform: '',
     order: 'asc',
+    status: '',
     sort: { consoles: { key: 'total', dir: -1 }, viewers: { key: 'played', dir: -1 } }
   };
 
@@ -135,6 +136,12 @@
   var $drips = document.getElementById('drips');
   var $tabs = document.getElementById('tabs');
   var $foot = document.getElementById('foot');
+
+  function unplayed(g) { return g.score === null && !g.done; }
+
+  function isListTab() {
+    return state.tab === 'ranking' || state.tab === 'zerados' || state.tab === 'fila' || state.tab === 'todos';
+  }
 
   function normalizeData(data) {
     var games = (data && data.games) || [];
@@ -336,7 +343,7 @@
 
   var WINDOW_TITLES = {
     ranking: 'ranking.lst', consoles: 'consoles.dat', viewers: 'viewers.dat',
-    zerados: 'zerados.lst', fila: 'fila.txt', sorteio: 'sorteio.exe'
+    zerados: 'zerados.lst', fila: 'fila.txt', todos: 'tudo.lst', sorteio: 'sorteio.exe'
   };
 
   function renderTabs() {
@@ -364,7 +371,7 @@
 
   function renderView() {
     if (!state.data) return;
-    if (state.tab === 'ranking' || state.tab === 'zerados' || state.tab === 'fila') renderListView();
+    if (isListTab()) renderListView();
     else if (state.tab === 'consoles') renderTable('consoles');
     else if (state.tab === 'viewers') renderTable('viewers');
     else renderRoulette();
@@ -385,6 +392,13 @@
         '<label class="field field--grow">Buscar jogo ou viewer' +
           '<input type="search" id="q" value="' + esc(state.q) + '" autocomplete="off"></label>' +
         '<label class="field">Console<select id="platform">' + consoleOptions() + '</select></label>' +
+        (state.tab === 'todos'
+          ? '<label class="field">Situação<select id="status">' +
+              '<option value=""' + (state.status === '' ? ' selected' : '') + '>Todos</option>' +
+              '<option value="played"' + (state.status === 'played' ? ' selected' : '') + '>Já jogados</option>' +
+              '<option value="pending"' + (state.status === 'pending' ? ' selected' : '') + '>Ainda não jogados</option>' +
+            '</select></label>'
+          : '') +
         (isRanking
           ? '<label class="field">Ordem<select id="order">' +
               '<option value="asc"' + (state.order === 'asc' ? ' selected' : '') + '>Pior nota primeiro</option>' +
@@ -395,6 +409,7 @@
 
     document.getElementById('q').addEventListener('input', function (e) { state.q = e.target.value; renderResults(); });
     document.getElementById('platform').addEventListener('change', function (e) { state.platform = e.target.value; renderResults(); });
+    if (state.tab === 'todos') document.getElementById('status').addEventListener('change', function (e) { state.status = e.target.value; renderResults(); });
     if (isRanking) document.getElementById('order').addEventListener('change', function (e) { state.order = e.target.value; renderResults(); });
 
     renderResults();
@@ -445,8 +460,30 @@
               : '<span class="score__num">' + fmt(g.score, 1) + '</span>') + '</div></li>';
         }).join('') + '</ul>';
       }
+    } else if (state.tab === 'todos') {
+      var all = games.filter(function (g) {
+        if (!matches(g)) return false;
+        if (state.status === 'pending') return unplayed(g);
+        if (state.status === 'played') return !unplayed(g);
+        return true;
+      }).sort(function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); });
+      var pendingN = all.filter(unplayed).length;
+      html = '<p class="count" aria-live="polite">' + plural(all.length, 'jogo', 'jogos') +
+        ' (' + (all.length - pendingN) + ' já jogados, ' + pendingN + ' ainda não jogados)</p>';
+      if (!all.length) {
+        html += '<div class="notice">Nenhum jogo encontrado. Limpe a busca ou escolha outro filtro.</div>';
+      } else {
+        html += '<ul class="list">' + all.map(function (g) {
+          var right = g.score !== null
+            ? '<span class="score__num">' + fmt(g.score, 1) + '</span>'
+            : (g.done ? '<span class="score__num score--none">sem nota</span>'
+                      : '<span class="score__num score--pending">não jogado</span>');
+          return '<li class="row row--plain' + (unplayed(g) ? ' row--pending' : '') + '"><div>' + gameInfo(g) + '</div>' +
+            '<div class="score">' + right + '</div></li>';
+        }).join('') + '</ul>';
+      }
     } else {
-      var queue = games.filter(function (g) { return g.score === null && matches(g); });
+      var queue = games.filter(function (g) { return unplayed(g) && matches(g); });
       html = '<p class="count" aria-live="polite">' + plural(queue.length, 'jogo', 'jogos') + ' na fila</p>';
       if (!queue.length) {
         html += '<div class="notice">Nenhum jogo na fila com esses filtros.</div>';
@@ -506,11 +543,11 @@
 
   var SPIN_MS = 5200;
   var SPIN_ROWS = 42;
-  var roulette = { busy: false, platform: '', history: [] };
+  var roulette = { busy: false, platform: '' };
 
   function queueGames() {
     return state.data.games.filter(function (g) {
-      return g.score === null && (!roulette.platform || g.console === roulette.platform);
+      return unplayed(g) && (!roulette.platform || g.console === roulette.platform);
     });
   }
 
@@ -521,7 +558,7 @@
 
   function renderRoulette() {
     roulette.busy = false;
-    var queueAll = state.data.games.filter(function (g) { return g.score === null; });
+    var queueAll = state.data.games.filter(unplayed);
     var names = {};
     queueAll.forEach(function (g) { if (g.console) names[g.console] = true; });
     var options = '<option value="">Todos</option>' + Object.keys(names)
@@ -545,16 +582,17 @@
         '</div>' +
         '<button type="button" class="spin" id="spin">SORTEAR</button>' +
         '<div class="result" id="rresult" role="status" aria-live="polite"></div>' +
-        '<div id="rhistory"></div>' +
+        '<div id="rleft"></div>' +
       '</section>';
 
     document.getElementById('spin').addEventListener('click', spinRoulette);
     document.getElementById('rplatform').addEventListener('change', function (e) {
       roulette.platform = e.target.value;
       updateRouletteCount();
+      renderRemaining();
     });
     updateRouletteCount();
-    renderRouletteHistory();
+    renderRemaining();
   }
 
   function updateRouletteCount() {
@@ -566,14 +604,24 @@
     else document.getElementById('rresult').innerHTML = '';
   }
 
-  function renderRouletteHistory() {
-    var $h = document.getElementById('rhistory');
-    if (!$h) return;
-    $h.innerHTML = roulette.history.length
-      ? '<h3 class="history__h">Já saíram</h3><ol class="history">' + roulette.history.map(function (g) {
-          return '<li><span>' + esc(g.title) + '</span><span class="chip">' + esc(g.console) + '</span></li>';
-        }).join('') + '</ol>'
-      : '';
+  function renderRemaining() {
+    var $l = document.getElementById('rleft');
+    if (!$l) return;
+    var by = {};
+    state.data.games.filter(unplayed).forEach(function (g) {
+      var c = g.console || 'sem console';
+      by[c] = (by[c] || 0) + 1;
+    });
+    var rows = Object.keys(by).map(function (c) { return { name: c, n: by[c] }; })
+      .sort(function (x, y) { return y.n - x.n || x.name.localeCompare(y.name, 'pt-BR'); });
+    if (!rows.length) { $l.innerHTML = ''; return; }
+    var top = rows[0].n;
+    $l.innerHTML = '<section class="left"><h3 class="left__h">Jogos restantes por console</h3><ol class="left__list">' +
+      rows.map(function (r) {
+        return '<li' + (r.name === roulette.platform ? ' class="is-sel"' : '') + '><span class="left__name">' + esc(r.name) + '</span>' +
+          '<span class="left__bar" aria-hidden="true"><i style="width:' + (r.n / top * 100).toFixed(1) + '%"></i></span>' +
+          '<span class="left__n">' + r.n + '</span></li>';
+      }).join('') + '</ol></section>';
   }
 
   function spinRoulette() {
@@ -614,9 +662,6 @@
         '<p class="result__title">' + esc(g.title) + '</p>' +
         '<p class="result__meta"><span class="chip">' + esc(g.console) + '</span>' +
         (g.viewer ? 'indicado por <strong>' + esc(g.viewer) + '</strong>' : '') + '</p>';
-      roulette.history.unshift(g);
-      roulette.history = roulette.history.slice(0, 6);
-      renderRouletteHistory();
       $btn.textContent = 'SORTEAR DE NOVO';
       $btn.disabled = false;
       $btn.focus();
@@ -655,12 +700,17 @@
 
     state.q = viewerBtn ? viewerBtn.dataset.viewer : '';
     state.platform = consoleBtn ? consoleBtn.dataset.console : '';
-    if (state.tab === 'ranking' || state.tab === 'zerados' || state.tab === 'fila') renderListView();
+    if (viewerBtn) {
+      state.status = '';
+      if (state.tab === 'todos') renderListView(); else setTab('todos');
+      return;
+    }
+    if (isListTab()) renderListView();
     else setTab('ranking');
   });
 
   var initial = (location.hash || '').replace('#', '');
-  if (['ranking', 'consoles', 'viewers', 'zerados', 'fila', 'sorteio'].indexOf(initial) !== -1) state.tab = initial;
+  if (['ranking', 'consoles', 'viewers', 'zerados', 'fila', 'todos', 'sorteio'].indexOf(initial) !== -1) state.tab = initial;
 
   load();
 </script>
