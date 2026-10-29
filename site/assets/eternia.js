@@ -296,17 +296,46 @@
     var savedVol = localStorage.getItem('eternia:vol');
     if (savedVol !== null && isFinite(Number(savedVol))) ytVol = Math.max(0, Math.min(100, Number(savedVol)));
   } catch (e) {}
-  $('ytvol').value = ytVol;
-  $('ytvolv').textContent = ytVol;
-  $('ytvol').addEventListener('input', function () {
-    ytVol = Number(this.value);
+  var ytVolBefore = ytVol || 85;
+  function applyVol(v, save) {
+    ytVol = Math.max(0, Math.min(100, Math.round(v)));
+    if (ytVol > 0) ytVolBefore = ytVol;
+    $('ytvolfill').style.setProperty('--v', ytVol + '%');
+    $('ytvol').setAttribute('aria-valuenow', String(ytVol));
     $('ytvolv').textContent = ytVol;
+    $('ytmute').classList.toggle('is-muted', ytVol === 0);
     if (yt && yt.setVolume) {
       yt.setVolume(ytVol);
       if (ytVol > 0 && yt.isMuted && yt.isMuted()) yt.unMute();
     }
-    try { localStorage.setItem('eternia:vol', String(ytVol)); } catch (e) {}
-  });
+    if (save) { try { localStorage.setItem('eternia:vol', String(ytVol)); } catch (e) {} }
+  }
+  applyVol(ytVol, false);
+  (function () {
+    var bar = $('ytvol'), drag = false;
+    var fromPointer = function (e) {
+      var r = bar.getBoundingClientRect();
+      applyVol(Math.round((e.clientX - r.left) / r.width * 20) * 5, true);
+    };
+    bar.addEventListener('pointerdown', function (e) {
+      drag = true;
+      try { bar.setPointerCapture(e.pointerId); } catch (err) {}
+      fromPointer(e);
+      e.preventDefault();
+    });
+    bar.addEventListener('pointermove', function (e) { if (drag) fromPointer(e); });
+    var end = function () { drag = false; };
+    bar.addEventListener('pointerup', end);
+    bar.addEventListener('pointercancel', end);
+    bar.addEventListener('keydown', function (e) {
+      var step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5, PageUp: 20, PageDown: -20 }[e.key];
+      if (e.key === 'Home') { applyVol(0, true); e.preventDefault(); return; }
+      if (e.key === 'End') { applyVol(100, true); e.preventDefault(); return; }
+      if (step) { applyVol(ytVol + step, true); e.preventDefault(); }
+    });
+    $('ytmute').addEventListener('click', function () { applyVol(ytVol === 0 ? ytVolBefore : 0, true); });
+  })();
+
   function isPaused() { return ytId ? !(yt && (ytState === 1 || ytState === 3)) : music.paused; }
 
   music.volume = 0.85;

@@ -57,9 +57,9 @@
           <span class="ytctl__name" id="ytname" aria-live="polite"></span>
           <button type="button" id="ytnext" aria-label="Próxima música">&#9654;&#9654;</button>
           <div class="ytvol">
-            <label for="ytvol">vol</label>
-            <input type="range" id="ytvol" min="0" max="100" step="1" value="85">
-            <output id="ytvolv" for="ytvol">85</output>
+            <button type="button" class="ytvol__btn" id="ytmute" aria-label="Silenciar">vol</button>
+            <div class="ytvol__bar" id="ytvol" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="85"><i id="ytvolfill"></i></div>
+            <output id="ytvolv">85</output>
           </div>
         </div>
         <canvas id="bars" width="120" height="40" aria-hidden="true"></canvas>

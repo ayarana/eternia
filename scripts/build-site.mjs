@@ -1,5 +1,6 @@
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -67,6 +68,14 @@ const zerados = hasZerados
   ? buildApp({ dir: 'jogos-zerados', route: '/jogos-zerados/', url: zeradosUrl, global: 'ZERADOS_API_URL', label: 'de jogos zerados' })
   : null;
 
+const stamp = (file) => {
+  try { return createHash('sha1').update(readFileSync(file)).digest('hex').slice(0, 10); } catch (e) { return null; }
+};
+const bust = (html) => html.replace(/(href|src)="(\/assets\/[\w.-]+\.(?:css|js))"/g, (m, attr, path) => {
+  const h = stamp(join(dist, path));
+  return h ? `${attr}="${path}?v=${h}"` : m;
+});
+
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(join(dist, 'retro-chorume'), { recursive: true });
 if (zerados) mkdirSync(join(dist, 'jogos-zerados'), { recursive: true });
@@ -101,9 +110,9 @@ if (zerados) {
   if (!SOON.test(homeHtml)) fail('não encontrei o botão "EM BREVE" de jogos zerados em site/index.html.');
   homeHtml = homeHtml.replace(SOON, zeradosCta);
 }
-writeFileSync(join(dist, 'index.html'), homeHtml);
-writeFileSync(join(dist, 'retro-chorume', 'index.html'), app);
-if (zerados) writeFileSync(join(dist, 'jogos-zerados', 'index.html'), zerados);
+writeFileSync(join(dist, 'index.html'), bust(homeHtml));
+writeFileSync(join(dist, 'retro-chorume', 'index.html'), bust(app));
+if (zerados) writeFileSync(join(dist, 'jogos-zerados', 'index.html'), bust(zerados));
 
 console.log('dist/ pronto.' + (rndFiles.length ? ` (${rndFiles.length} imagens aleatórias)` : ''));
 const where = (u, file) => (u ? '(dados de ' + (demo ? file : u.replace(/\/s\/[\w-]+\//, '/s/…/')) + ')' : '(sem endereço de dados)');

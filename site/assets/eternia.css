@@ -770,13 +770,13 @@ body:not(.is-in) .hero__ring, body:not(.is-in) .spark { opacity: 0; }
 .ytctl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem; width: 200px; margin: 0 auto; }
 .ytctl button { flex: none; width: 2.3rem; height: 1.8rem; padding: 0; border: 2px solid var(--pink); background: #000; color: var(--pink); font: 500 0.7rem/1 var(--display); letter-spacing: -0.1em; cursor: pointer; }
 .ytctl button:hover, .ytctl button:focus-visible { background: var(--pink); color: #000; }
-.ytvol { order: 4; flex: 0 0 100%; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.1rem; color: var(--text-soft); font: 400 1rem/1 var(--body); }
-.ytvol input { flex: 1; min-width: 0; height: 1.4rem; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.ytvol input::-webkit-slider-runnable-track { height: 6px; background: repeating-linear-gradient(90deg, var(--lilac) 0 4px, transparent 4px 6px); }
-.ytvol input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 16px; margin-top: -5px; border: 2px solid #000; background: var(--pink); }
-.ytvol input::-moz-range-track { height: 6px; background: repeating-linear-gradient(90deg, var(--lilac) 0 4px, transparent 4px 6px); }
-.ytvol input::-moz-range-thumb { width: 6px; height: 12px; border: 2px solid #000; border-radius: 0; background: var(--pink); }
-.ytvol input:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.ytvol { order: 4; flex: 0 0 100%; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.15rem; font: 400 1rem/1 var(--body); }
+.ytvol__btn { flex: none; padding: 0.1rem 0.35rem; border: 2px solid var(--pink); background: #000; color: var(--pink); font: 500 0.7rem/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.ytvol__btn:hover, .ytvol__btn:focus-visible { background: var(--pink); color: #000; }
+.ytvol__btn.is-muted { border-style: dashed; color: var(--text-soft); border-color: var(--lilac-dim); }
+.ytvol__bar { position: relative; flex: 1; min-width: 0; height: 16px; cursor: pointer; touch-action: none; background: repeating-linear-gradient(90deg, rgba(169, 156, 246, 0.28) 0 7px, transparent 7px 10px); }
+.ytvol__bar i { position: absolute; inset: 0 auto 0 0; width: var(--v, 85%); background: repeating-linear-gradient(90deg, var(--pink) 0 7px, transparent 7px 10px); box-shadow: 0 0 10px rgba(255, 139, 232, 0.35); pointer-events: none; }
+.ytvol__bar:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
 .ytvol output { min-width: 2.2ch; text-align: right; color: var(--pink); }
 .ytctl__name { order: 3; flex: 0 0 100%; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); font: 400 1rem/1 var(--body); }
 @media (min-width: 1000px) { .pn--signal.is-yt ~ .pn--log { top: max(30rem, 60vh); } }
