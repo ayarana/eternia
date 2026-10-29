@@ -34,3 +34,17 @@
   --edge: linear-gradient(135deg, #f6f08c, #ff8be8);
   color: #000;
 }
+
+.srcfoot {
+  position: relative;
+  z-index: 3;
+  padding: 0.4rem 1rem 1.6rem;
+  text-align: center;
+  color: #a79de6;
+  font: 500 0.8rem/1 'Pixelify Sans', 'Courier New', monospace;
+  letter-spacing: 0.08em;
+}
+
+.srcfoot a { color: #e0daff; text-decoration: none; border-bottom: 1px dotted #ff8be8; }
+.srcfoot a:hover, .srcfoot a:focus-visible { color: #ff8be8; }
+.srcfoot b { color: #ff8be8; font-weight: 500; }

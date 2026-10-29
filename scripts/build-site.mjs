@@ -38,6 +38,8 @@ const nav = (current) =>
 
 const home = read('site', 'index.html');
 
+const srcFooter = `  <footer class="srcfoot">source code: <a href="https://github.com/ayarana/eternia" target="_blank" rel="noopener noreferrer">github</a> <b aria-hidden="true">♥</b></footer>\n`;
+
 const favicon =
   `  <link rel="icon" type="image/png" href="/assets/favicon.png">\n` +
   `  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">\n`;
@@ -52,8 +54,10 @@ const buildApp = ({ dir, route, url, global, label }) => {
     .replace('</head>', favicon +
       `  <link rel="stylesheet" href="/assets/nav.css">\n` +
       (url ? `  <script>window.${global} = ${JSON.stringify(url)};</script>\n` : '') + '</head>')
-    .replace(/<body>/, '<body>\n  ' + nav(route));
+    .replace(/<body>/, '<body>\n  ' + nav(route))
+    .replace('</body>', srcFooter + '</body>');
   if (html.includes('<?')) fail(`sobrou um trecho <? ?> do Apps Script na página ${label}.`);
+  if (!html.includes('class="srcfoot"')) fail(`não consegui colocar o rodapé na página ${label} (procurei por </body>).`);
   if (!html.includes('class="sitenav"')) fail(`não consegui colocar o menu na página ${label} (procurei por <body>).`);
   return html;
 };
