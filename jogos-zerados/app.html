@@ -1,0 +1,300 @@
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { data: null, year: null, con: '', q: '', order: 'recent' };
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var counted = false;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function norm(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  function nf(n) { return Number(n).toLocaleString('pt-BR'); }
+  function plural(n, one, many) { return nf(n) + ' ' + (n === 1 ? one : many); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function fmtMin(m) {
+    if (m === null || m === undefined) return '';
+    var t = Math.round(m);
+    if (t < 60) return t + 'min';
+    var h = Math.floor(t / 60), r = t % 60;
+    return h + 'h' + (r ? pad(r) : '');
+  }
+  function fmtDay(iso, withYear) {
+    var p = iso.split('-');
+    return p[2] + '/' + p[1] + (withYear ? '/' + p[0] : '');
+  }
+  function fmtDate(g) {
+    if (!g.end) return '';
+    if (g.start && g.start !== g.end) {
+      var sameYear = g.start.slice(0, 4) === g.end.slice(0, 4);
+      return fmtDay(g.start, !sameYear) + ' → ' + fmtDay(g.end, true);
+    }
+    return fmtDay(g.end, true);
+  }
+  function hue(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return h % 4;
+  }
+
+  function normalizeData(data) {
+    var games = (data && data.games) || [];
+    games.forEach(function (g) {
+      g.console = g.console || 'Outro';
+      g.minutes = typeof g.minutes === 'number' && isFinite(g.minutes) ? g.minutes : null;
+      g.comment = g.comment || '';
+      g._s = norm(g.title + ' ' + g.comment);
+    });
+    return { games: games, updatedAt: data && data.updatedAt };
+  }
+
+  function fetchData(ok, fail) {
+    if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getData();
+      return;
+    }
+    if (!window.ZERADOS_API_URL) { fail(new Error('Falta o endereço dos dados (ZERADOS_API_URL).')); return; }
+    fetch(window.ZERADOS_API_URL + '?format=json', { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('O servidor respondeu ' + res.status + '.');
+        return res.json();
+      })
+      .then(function (data) {
+        if (data && data.error) throw new Error(data.error);
+        ok(data);
+      })
+      .catch(function (err) {
+        fail(err instanceof SyntaxError
+          ? new Error('Resposta inesperada do Apps Script. Confira se a implantação está aberta para "Qualquer pessoa".')
+          : err);
+      });
+  }
+
+  function load() {
+    fetchData(
+      function (data) { state.data = normalizeData(data); renderAll(); },
+      function (err) {
+        $('list').innerHTML = '<div class="notice"><p>' + esc(err && err.message ? err.message : String(err)) +
+          '</p><button type="button" id="retry">Tentar de novo</button></div>';
+        $('retry').addEventListener('click', load);
+      }
+    );
+  }
+
+  function groupBy(games, key) {
+    var out = {};
+    games.forEach(function (g) { var k = g[key]; (out[k] = out[k] || []).push(g); });
+    return out;
+  }
+
+  function countUp(el, to) {
+    if (reduce || counted) { el.textContent = nf(to); return; }
+    var t0 = null, dur = 900;
+    function step(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      el.textContent = nf(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function renderKpis() {
+    var games = state.data.games;
+    var mins = games.reduce(function (s, g) { return s + (g.minutes || 0); }, 0);
+    var hours = Math.round(mins / 60);
+    var cons = groupBy(games, 'console');
+    var names = Object.keys(cons);
+    var top = names.sort(function (a, b) { return cons[b].length - cons[a].length; })[0];
+    var longest = games.filter(function (g) { return g.minutes !== null; })
+      .sort(function (a, b) { return b.minutes - a.minutes; })[0];
+    $('kpis').innerHTML =
+      '<div class="hud kpi"><p class="kpi__l">Jogos zerados</p><p class="kpi__n" id="kn">0</p><p class="kpi__s">de 2020 até hoje</p></div>' +
+      '<div class="hud kpi"><p class="kpi__l">Tempo de jogo</p><p class="kpi__n">' + nf(hours) + '<small>h</small></p><p class="kpi__s">≈ ' + plural(Math.round(hours / 24), 'dia', 'dias') + ' seguidos</p></div>' +
+      '<div class="hud kpi"><p class="kpi__l">Consoles</p><p class="kpi__n">' + names.length + '</p><p class="kpi__s">mais zerados: ' + esc(top || '—') + '</p></div>' +
+      '<div class="hud kpi"><p class="kpi__l">Mais longo</p>' +
+        (longest ? '<p class="kpi__t">' + esc(longest.title) + '</p><p class="kpi__s">' + fmtMin(longest.minutes) + ' · ' + esc(longest.console) + '</p>'
+                 : '<p class="kpi__t">—</p>') + '</div>';
+    countUp($('kn'), games.length);
+    counted = true;
+  }
+
+  function renderYears() {
+    var by = groupBy(state.data.games, 'year');
+    var years = Object.keys(by).sort();
+    var max = Math.max.apply(null, years.map(function (y) { return by[y].length; }));
+    $('years').innerHTML = '<h2 class="hud__h">Por ano</h2><div class="yrs">' + years.map(function (y) {
+      var n = by[y].length;
+      return '<button type="button" class="yr' + (String(state.year) === y ? ' is-on' : '') + '" data-year="' + y + '" aria-pressed="' + (String(state.year) === y) + '">' +
+        '<span class="yr__n">' + n + '</span><span class="yr__bar" style="height:' + Math.max(n / max * 100, 3).toFixed(1) + '%"></span>' +
+        '<span class="yr__y">' + y + '</span></button>';
+    }).join('') + '</div>';
+    $('fyear').innerHTML = '<option value="">Todos</option>' + years.slice().reverse().map(function (y) {
+      return '<option value="' + y + '"' + (String(state.year) === y ? ' selected' : '') + '>' + y + ' (' + by[y].length + ')</option>';
+    }).join('');
+  }
+
+  function consoleList() {
+    var by = groupBy(state.data.games, 'console');
+    return Object.keys(by).map(function (c) { return { name: c, n: by[c].length }; })
+      .sort(function (a, b) { return b.n - a.n || a.name.localeCompare(b.name, 'pt-BR'); });
+  }
+
+  function renderConsoles() {
+    var list = consoleList();
+    var top = list.slice(0, 8), max = top[0] ? top[0].n : 1;
+    $('consoles').innerHTML = '<h2 class="hud__h">Por console</h2><div class="cons">' + top.map(function (c) {
+      return '<button type="button" class="con' + (state.con === c.name ? ' is-on' : '') + '" data-con="' + esc(c.name) + '" aria-pressed="' + (state.con === c.name) + '">' +
+        '<span class="con__name">' + esc(c.name) + '</span>' +
+        '<span class="con__bar"><i style="width:' + (c.n / max * 100).toFixed(1) + '%"></i></span>' +
+        '<span class="con__n">' + c.n + '</span></button>';
+    }).join('') + '</div>';
+    var opts = '<option value="">Todos</option>' + list.map(function (c) {
+      return '<option value="' + esc(c.name) + '"' + (state.con === c.name ? ' selected' : '') + '>' + esc(c.name) + ' (' + c.n + ')</option>';
+    }).join('');
+    $('fconsole').innerHTML = opts;
+  }
+
+  function filtered() {
+    var q = norm(state.q);
+    return state.data.games.filter(function (g) {
+      if (state.year && g.year !== state.year) return false;
+      if (state.con && g.console !== state.con) return false;
+      return !q || g._s.indexOf(q) !== -1;
+    });
+  }
+
+  function sorted(list) {
+    var l = list.slice();
+    var by = state.order;
+    if (by === 'oldest') l.sort(function (a, b) { return a.n - b.n; });
+    else if (by === 'long' || by === 'short') {
+      var dir = by === 'long' ? -1 : 1;
+      l.sort(function (a, b) {
+        if (a.minutes === null && b.minutes === null) return a.n - b.n;
+        if (a.minutes === null) return 1;
+        if (b.minutes === null) return -1;
+        return (a.minutes - b.minutes) * dir || a.n - b.n;
+      });
+    } else if (by === 'az') l.sort(function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); });
+    else l.sort(function (a, b) { return b.n - a.n; });
+    return l;
+  }
+
+  function entry(g) {
+    var k = hue(g.console);
+    var t = g.minutes !== null ? fmtMin(g.minutes) : (g.time || '');
+    var d = fmtDate(g);
+    return '<li class="ent k' + k + (g.comment ? ' has-cm' : '') + '"' + (g.comment ? ' tabindex="0" role="button" aria-expanded="false"' : '') + '>' +
+      '<span class="ent__n">#' + String(g.n).padStart(3, '0') + '</span>' +
+      '<h3 class="ent__t">' + esc(g.title) + '</h3>' +
+      (g.comment ? '<p class="ent__cm">' + esc(g.comment) + '</p>' : '') +
+      '<div class="ent__m"><span class="tag">' + esc(g.console) + '</span>' +
+      '<span class="ent__time' + (t ? '' : ' none') + '">' + (t || 'tempo ?') + '</span>' +
+      '<span class="ent__date' + (d ? '' : ' none') + '">' + (d || (g.year ? '? / ' + g.year : 'data ?')) + '</span></div></li>';
+  }
+
+  function groupHead(year, games) {
+    var mins = games.reduce(function (s, g) { return s + (g.minutes || 0); }, 0);
+    return '<div class="grp"><span class="grp__y">' + (year || '????') + '</span><span class="grp__l"></span>' +
+      '<span class="grp__s">' + plural(games.length, 'jogo', 'jogos') + ' · ' + nf(Math.round(mins / 60)) + ' h</span></div>';
+  }
+
+  function renderList() {
+    var list = sorted(filtered());
+    var total = state.data.games.length;
+    var on = state.year || state.con || state.q;
+    $('clear').hidden = !on;
+    $('count').textContent = list.length === total
+      ? plural(total, 'jogo zerado', 'jogos zerados')
+      : plural(list.length, 'jogo', 'jogos') + ' de ' + nf(total);
+    if (!list.length) {
+      $('list').innerHTML = '<div class="notice">Nada por aqui. Limpe a busca ou troque o filtro.</div>';
+      return;
+    }
+    var byDate = state.order === 'recent' || state.order === 'oldest';
+    var html = '';
+    if (byDate) {
+      var run = [], cur = null;
+      var flush = function () {
+        if (!run.length) return;
+        html += groupHead(cur, run) + '<ul class="ents">' + run.map(entry).join('') + '</ul>';
+        run = [];
+      };
+      list.forEach(function (g) {
+        if (g.year !== cur) { flush(); cur = g.year; }
+        run.push(g);
+      });
+      flush();
+    } else {
+      html = '<ul class="ents">' + list.map(entry).join('') + '</ul>';
+    }
+    $('list').innerHTML = html;
+  }
+
+  function renderFooter() {
+    var when = state.data.updatedAt ? new Date(state.data.updatedAt) : null;
+    $('ft').innerHTML = '<span>dados da planilha' + (when && !isNaN(when) ? ' · ' + when.toLocaleString('pt-BR') : '') + '</span>' +
+      '<button type="button" id="reload">atualizar</button>';
+    $('reload').addEventListener('click', load);
+  }
+
+  function renderAll() {
+    renderKpis();
+    renderYears();
+    renderConsoles();
+    renderList();
+    renderFooter();
+    $('order').value = state.order;
+    $('q').value = state.q;
+  }
+
+  function refresh() { renderYears(); renderConsoles(); renderList(); }
+
+  $('years').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-year]');
+    if (!b) return;
+    var y = Number(b.dataset.year);
+    state.year = state.year === y ? null : y;
+    refresh();
+  });
+  $('consoles').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-con]');
+    if (!b) return;
+    state.con = state.con === b.dataset.con ? '' : b.dataset.con;
+    refresh();
+  });
+  $('fyear').addEventListener('change', function (e) { state.year = e.target.value ? Number(e.target.value) : null; refresh(); });
+  $('fconsole').addEventListener('change', function (e) { state.con = e.target.value; refresh(); });
+  $('order').addEventListener('change', function (e) { state.order = e.target.value; renderList(); });
+  $('q').addEventListener('input', function (e) { state.q = e.target.value; renderList(); });
+  $('clear').addEventListener('click', function () {
+    state.year = null; state.con = ''; state.q = ''; $('q').value = '';
+    refresh();
+  });
+  function toggle(li) {
+    if (!li || !li.classList.contains('has-cm')) return;
+    var open = li.classList.toggle('is-open');
+    li.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  $('list').addEventListener('click', function (e) { toggle(e.target.closest('.ent')); });
+  $('list').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { var li = e.target.closest('.ent'); if (li) { e.preventDefault(); toggle(li); } }
+  });
+
+  var spot = $('spot');
+  if (spot && !reduce) {
+    window.addEventListener('pointermove', function (e) {
+      spot.style.setProperty('--mx', (e.clientX / innerWidth * 100).toFixed(1) + '%');
+      spot.style.setProperty('--my', (e.clientY / innerHeight * 100).toFixed(1) + '%');
+    }, { passive: true });
+  }
+
+  load();
+})();
+</script>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jogos Zerados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=VT323&display=swap" rel="stylesheet">
+  <?!= include('styles') ?>
+</head>
+<body>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="spot" id="spot" aria-hidden="true"></div>
+
+  <div class="page">
+    <header class="hd">
+      <p class="hd__path">C:\ETÉRNIA\ARQUIVO\ZERADOS.DAT<span class="hd__cur" aria-hidden="true"></span></p>
+      <h1 class="hd__title" data-text="JOGOS ZERADOS">JOGOS ZERADOS</h1>
+      <p class="hd__sub"><a href="https://www.twitch.tv/nathanmad77" target="_blank" rel="noopener noreferrer">twitch.tv/nathanmad77</a></p>
+    </header>
+
+    <section class="kpis" id="kpis" aria-label="Resumo"></section>
+
+    <section class="charts" aria-label="Filtros por ano e por console">
+      <div class="hud hud--a" id="years"></div>
+      <div class="hud hud--b" id="consoles"></div>
+    </section>
+
+    <section class="ctl hud hud--c" aria-label="Busca e ordem">
+      <label class="fld fld--grow">Buscar jogo ou comentário
+        <input type="search" id="q" autocomplete="off" placeholder="digite…">
+      </label>
+      <label class="fld">Ano<select id="fyear"></select></label>
+      <label class="fld">Console<select id="fconsole"></select></label>
+      <label class="fld">Ordem
+        <select id="order">
+          <option value="recent">Mais recentes</option>
+          <option value="oldest">Mais antigos</option>
+          <option value="long">Mais longos</option>
+          <option value="short">Mais curtos</option>
+          <option value="az">A → Z</option>
+        </select>
+      </label>
+      <button type="button" class="clear" id="clear" hidden>limpar filtros</button>
+    </section>
+
+    <p class="count" id="count" aria-live="polite"></p>
+    <main id="list" class="list"></main>
+
+    <footer class="ft" id="ft"></footer>
+  </div>
+
+  <?!= include('app') ?>
+</body>
+</html>
