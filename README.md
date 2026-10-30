@@ -20,3 +20,5 @@ WebApp em Appscript para o Retrô Chorume, onde os viewers super amáveis e soli
 
 </div>
 
+(vibe coded)
+
