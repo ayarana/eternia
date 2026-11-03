@@ -93,6 +93,7 @@ jobs:
         env:
           APPS_SCRIPT_URL: https://script.google.com/macros/s/${{ vars.DEPLOYMENT_ID }}/exec
           APPS_SCRIPT_ZERADOS_URL: ${{ vars.DEPLOYMENT_ID_ZERADOS != '' && format('https://script.google.com/macros/s/{0}/exec', vars.DEPLOYMENT_ID_ZERADOS) || '' }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: node scripts/build-site.mjs
 
       - name: Publicar no Netlify

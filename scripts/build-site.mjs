@@ -30,6 +30,14 @@ if (demo) {
 if (!demo) checkUrl('APPS_SCRIPT_ZERADOS_URL', zeradosUrl);
 const hasZerados = !!zeradosUrl;
 
+const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+if (googleClientId && !/^[\w-]+\.apps\.googleusercontent\.com$/.test(googleClientId)) {
+  fail('GOOGLE_CLIENT_ID não parece um ID de cliente do Google (deve terminar em .apps.googleusercontent.com).');
+}
+const retroExtra =
+  (googleClientId ? ` window.RETRO_GOOGLE_CLIENT_ID = ${JSON.stringify(googleClientId)};` : '') +
+  (demo ? ' window.RETRO_DEMO = true;' : '');
+
 const menu = JSON.parse(read('site', 'menu.json')).filter((m) => !m.only || (m.only === 'zerados' && hasZerados));
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nav = (current) =>
@@ -45,7 +53,7 @@ const favicon =
   `  <link rel="icon" type="image/png" href="/assets/favicon.png">\n` +
   `  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">\n`;
 
-const buildApp = ({ dir, route, url, global, label }) => {
+const buildApp = ({ dir, route, url, global, label, extra = '' }) => {
   let html = read(dir, 'index.html').replace(/<\?!=\s*include\('([\w-]+)'\)\s*\?>/g, (_, name) => {
     if (!existsSync(join(root, dir, name + '.html'))) fail(`${dir}/index.html pede include('${name}'), mas ${dir}/${name}.html não existe.`);
     return read(dir, name + '.html');
@@ -54,7 +62,7 @@ const buildApp = ({ dir, route, url, global, label }) => {
     .replace(/\s*<base target="_top">/, '')
     .replace('</head>', favicon +
       `  <link rel="stylesheet" href="/assets/nav.css">\n` +
-      (url ? `  <script>window.${global} = ${JSON.stringify(url)};</script>\n` : '') + '</head>')
+      (url || extra ? `  <script>${url ? `window.${global} = ${JSON.stringify(url)};` : ''}${extra}</script>\n` : '') + '</head>')
     .replace(/<body>/, '<body>\n  ' + nav(route))
     .replace('</body>', srcFooter + '</body>');
   if (html.includes('<?')) fail(`sobrou um trecho <? ?> do Apps Script na página ${label}.`);
@@ -63,7 +71,7 @@ const buildApp = ({ dir, route, url, global, label }) => {
   return html;
 };
 
-const app = buildApp({ dir: 'retro-chorume', route: '/retro-chorume/', url: apiUrl, global: 'RETRO_API_URL', label: 'do Retrô Chorume' });
+const app = buildApp({ dir: 'retro-chorume', route: '/retro-chorume/', url: apiUrl, global: 'RETRO_API_URL', label: 'do Retrô Chorume', extra: retroExtra });
 const zerados = hasZerados
   ? buildApp({ dir: 'jogos-zerados', route: '/jogos-zerados/', url: zeradosUrl, global: 'ZERADOS_API_URL', label: 'de jogos zerados' })
   : null;

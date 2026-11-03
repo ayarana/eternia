@@ -337,13 +337,19 @@
   }
 
   function renderFooter() {
-    $foot.innerHTML = '<button type="button" class="link" id="reload">Atualizar</button>';
+    var html = '<button type="button" class="link" id="reload">Atualizar</button>';
+    if (adminEnabled()) {
+      html += auth.admin
+        ? '<button type="button" class="link" data-admin="logout">sair do admin</button>'
+        : '<button type="button" class="link" data-admin="login">admin</button>';
+    }
+    $foot.innerHTML = html;
     document.getElementById('reload').addEventListener('click', load);
   }
 
   var WINDOW_TITLES = {
     ranking: 'ranking.lst', consoles: 'consoles.dat', viewers: 'viewers.dat',
-    zerados: 'zerados.lst', fila: 'fila.txt', todos: 'tudo.lst', sorteio: 'sorteio.exe'
+    zerados: 'zerados.lst', fila: 'fila.txt', todos: 'tudo.lst', sorteio: 'sorteio.exe', admin: 'admin.exe'
   };
 
   function renderTabs() {
@@ -351,10 +357,14 @@
       if (b.dataset.tab === state.tab) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
     });
+    var adminBtn = $tabs.querySelector('[data-tab="admin"]');
+    if (adminBtn) adminBtn.hidden = !auth.admin;
     document.getElementById('wintitle').textContent = WINDOW_TITLES[state.tab];
   }
 
   function setTab(tab) {
+    if (tab === 'admin' && !adminEnabled()) tab = 'ranking';
+    if (tab !== 'admin') adminState.msg = null;
     state.tab = tab;
     if (history.replaceState) { try { history.replaceState(null, '', '#' + tab); } catch (e) {} }
     renderTabs();
@@ -371,7 +381,8 @@
 
   function renderView() {
     if (!state.data) return;
-    if (isListTab()) renderListView();
+    if (state.tab === 'admin') renderAdminView();
+    else if (isListTab()) renderListView();
     else if (state.tab === 'consoles') renderTable('consoles');
     else if (state.tab === 'viewers') renderTable('viewers');
     else renderRoulette();
@@ -679,12 +690,303 @@
     setTimeout(land, SPIN_MS + 400);
   }
 
+  var auth = { token: null, email: '', admin: false, exp: 0, gis: false };
+  var adminState = { q: '', msg: null, busy: false };
+
+  function adminEnabled() {
+    if (window.google && google.script && google.script.run) return false;
+    return !!(window.RETRO_DEMO || (window.RETRO_API_URL && window.RETRO_GOOGLE_CLIENT_ID));
+  }
+
+  function decodeJwt(token) {
+    try {
+      var p = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (p.length % 4) p += '=';
+      var bin = atob(p);
+      return JSON.parse(decodeURIComponent(bin.split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join('')));
+    } catch (e) { return {}; }
+  }
+
+  function authValid() { return !!auth.token && Date.now() / 1000 < auth.exp - 60; }
+
+  function storeToken(token) {
+    try {
+      if (token) sessionStorage.setItem('retro_tok', token);
+      else sessionStorage.removeItem('retro_tok');
+    } catch (e) {}
+  }
+
+  function demoPost(action, body) {
+    return new Promise(function (resolve, reject) {
+      setTimeout(function () {
+        var who = decodeJwt(body.idToken);
+        if (who.email !== 'admin@demo') { reject(new Error('Acesso negado: esta conta não é admin do Retrô Chorume.')); return; }
+        if (action === 'whoami') { resolve({ ok: true, email: who.email, admin: true }); return; }
+        var g = body.game || {};
+        var same = state.data.games.filter(function (x) { return norm(x.title) === norm(g.jogo) && norm(x.console) === norm(g.console); });
+        if (action === 'add') {
+          if (same.length) { reject(new Error('Esse jogo já está na lista (' + g.console + ').')); return; }
+          state.data.games.push({ title: g.jogo, done: false, console: g.console, viewer: g.viewer || null, score: null });
+          resolve({ ok: true });
+          return;
+        }
+        var hit = same.filter(unplayed)[0];
+        if (!hit) { reject(new Error('Não achei esse jogo na lista. Atualize a página.')); return; }
+        hit.score = g.nota;
+        resolve({ ok: true });
+      }, 250);
+    });
+  }
+
+  function adminPost(action, body) {
+    if (window.RETRO_DEMO) return demoPost(action, body);
+    return fetch(window.RETRO_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, body))
+    }).then(function (res) { return res.json(); }).then(function (j) {
+      if (!j || !j.ok) throw new Error((j && j.error) || 'Erro desconhecido.');
+      return j;
+    }, function (err) {
+      throw err instanceof SyntaxError
+        ? new Error('Resposta inesperada do servidor.')
+        : new Error('Não consegui falar com o servidor. Tente de novo.');
+    });
+  }
+
+  function setLoginMsg(text, isErr) {
+    var el = document.getElementById('loginMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'msg' + (isErr ? ' msg--err' : '');
+  }
+
+  function setAdminMsg(text, isErr) {
+    adminState.msg = { text: text, err: !!isErr };
+    var el = document.getElementById('adminMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'msg' + (isErr ? ' msg--err' : '');
+  }
+
+  function signOut(keepView) {
+    auth.token = null; auth.email = ''; auth.admin = false; auth.exp = 0;
+    storeToken(null);
+    try { google.accounts.id.disableAutoSelect(); } catch (e) {}
+    renderTabs();
+    renderFooter();
+    if (!keepView && state.tab === 'admin') setTab('ranking');
+  }
+
+  function expired() {
+    signOut(true);
+    renderView();
+    setLoginMsg('Seu login expirou (dura cerca de 1 hora). Entre de novo.', true);
+  }
+
+  function onCredential(token, quiet) {
+    var who = decodeJwt(token);
+    auth.token = token; auth.exp = who.exp || 0; auth.email = who.email || '';
+    setLoginMsg('Verificando no servidor…', false);
+    return adminPost('whoami', { idToken: token }).then(function (r) {
+      auth.admin = true;
+      auth.email = r.email || auth.email;
+      storeToken(token);
+      renderTabs();
+      renderFooter();
+      if (!quiet) setTab('admin');
+      else if (state.tab === 'admin') renderView();
+    }, function (err) {
+      signOut(true);
+      if (!quiet) setLoginMsg('✖ ' + err.message, true);
+    });
+  }
+
+  function loadGis() {
+    return new Promise(function (resolve, reject) {
+      if (window.google && google.accounts && google.accounts.id) { resolve(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error('Não deu para carregar o login do Google.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function fakeToken(email) {
+    return 'x.' + btoa(JSON.stringify({ email: email, exp: Math.floor(Date.now() / 1000) + 3600 })).replace(/=+$/, '') + '.x';
+  }
+
+  function renderLoginView() {
+    $view.innerHTML =
+      '<div class="admin">' +
+        '<p>Entre com o Google para adicionar jogos e dar notas.</p>' +
+        '<div id="gsiBtn" class="gsi"></div>' +
+        '<div id="loginMsg" class="msg" role="status"></div>' +
+      '</div>';
+    if (window.RETRO_DEMO) {
+      document.getElementById('gsiBtn').innerHTML =
+        '<button type="button" class="btn" data-demo="admin@demo">Entrar como admin (demo)</button> ' +
+        '<button type="button" class="btn" data-demo="visitante@demo">Entrar como visitante (demo)</button>';
+      return;
+    }
+    loadGis().then(function () {
+      if (!auth.gis) {
+        google.accounts.id.initialize({
+          client_id: window.RETRO_GOOGLE_CLIENT_ID,
+          callback: function (r) { onCredential(r.credential, false); },
+          ux_mode: 'popup',
+          auto_select: false
+        });
+        auth.gis = true;
+      }
+      var box = document.getElementById('gsiBtn');
+      if (box && state.tab === 'admin') {
+        google.accounts.id.renderButton(box, { theme: 'filled_black', size: 'large', shape: 'rectangular', text: 'signin_with', locale: 'pt-BR' });
+      }
+    }).catch(function (err) { setLoginMsg('✖ ' + err.message, true); });
+  }
+
+  function byPt(a, b) { return a.localeCompare(b, 'pt-BR'); }
+
+  function datalist(id, names) {
+    return '<datalist id="' + id + '">' + names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
+  }
+
+  function renderAdminView() {
+    if (!auth.admin) { renderLoginView(); return; }
+    var games = state.data.games;
+    var consoles = groupStats(games, 'console').map(function (c) { return c.name; }).sort(byPt);
+    var viewers = groupStats(games, 'viewer').map(function (c) { return c.name; }).sort(byPt);
+    $view.innerHTML =
+      '<div class="admin">' +
+        '<p class="count">Logado como <strong>' + esc(auth.email) + '</strong> ' +
+          '<button type="button" class="link" data-admin="logout">sair</button></p>' +
+        '<h2>Novo jogo na fila</h2>' +
+        '<form id="addForm" class="filters" autocomplete="off">' +
+          '<label class="field field--grow">Jogo<input name="jogo" maxlength="150" required></label>' +
+          '<label class="field">Console<input name="console" maxlength="60" list="adminConsoles" required></label>' +
+          '<label class="field">Viewer<input name="viewer" maxlength="60" list="adminViewers"></label>' +
+          '<button type="submit" class="btn">Adicionar à fila</button>' +
+        '</form>' +
+        datalist('adminConsoles', consoles) + datalist('adminViewers', viewers) +
+        '<div id="adminMsg" class="msg" role="status"></div>' +
+        '<h2>Dar nota</h2>' +
+        '<div class="filters"><label class="field field--grow">Buscar na fila' +
+          '<input type="search" id="adminQ" value="' + esc(adminState.q) + '" autocomplete="off"></label></div>' +
+        '<div id="adminList"></div>' +
+      '</div>';
+    if (adminState.msg) setAdminMsg(adminState.msg.text, adminState.msg.err);
+    renderAdminList();
+  }
+
+  function renderAdminList() {
+    var q = norm(adminState.q);
+    var list = state.data.games.filter(unplayed).filter(function (g) {
+      return !q || norm(g.title).indexOf(q) !== -1 || norm(g.viewer).indexOf(q) !== -1 || norm(g.console).indexOf(q) !== -1;
+    }).sort(function (a, b) { return byPt(a.title, b.title); });
+
+    var html = '<p class="count" aria-live="polite">' + plural(list.length, 'jogo', 'jogos') + ' na fila</p>';
+    if (!list.length) {
+      html += '<div class="notice">Nenhum jogo na fila' + (q ? ' com essa busca' : '') + '.</div>';
+    } else {
+      html += '<ul class="list">' + list.map(function (g) {
+        return '<li class="row row--plain row--rate"><div><div class="title">' + esc(g.title) + '</div>' +
+          '<div class="meta"><span class="chip">' + esc(g.console) + '</span>' +
+          (g.viewer ? '<span>' + esc(g.viewer) + '</span>' : '<span>sem viewer</span>') + '</div></div>' +
+          '<form class="rate" data-title="' + esc(g.title) + '" data-console="' + esc(g.console) + '">' +
+            '<input type="number" name="nota" min="0.5" max="' + MAX_SCORE + '" step="0.5" inputmode="decimal" required aria-label="Nota de ' + esc(g.title) + '">' +
+            '<button type="submit" class="btn">Dar nota</button></form></li>';
+      }).join('') + '</ul>';
+    }
+    document.getElementById('adminList').innerHTML = html;
+  }
+
+  function refreshAfterWrite() {
+    if (window.RETRO_DEMO) renderAll();
+    else load();
+  }
+
+  function runAdmin(action, game, doneText) {
+    adminState.busy = true;
+    setAdminMsg('Salvando…', false);
+    Array.prototype.forEach.call($view.querySelectorAll('.admin button'), function (b) { b.disabled = true; });
+    adminPost(action, { idToken: auth.token, game: game }).then(function () {
+      adminState.busy = false;
+      adminState.msg = { text: doneText, err: false };
+      refreshAfterWrite();
+    }, function (err) {
+      adminState.busy = false;
+      Array.prototype.forEach.call($view.querySelectorAll('.admin button'), function (b) { b.disabled = false; });
+      setAdminMsg('✖ ' + err.message, true);
+    });
+  }
+
+  function submitAdd(form) {
+    if (adminState.busy) return;
+    if (!authValid()) { expired(); return; }
+    var game = {
+      jogo: form.elements.jogo.value.trim(),
+      console: form.elements['console'].value.trim(),
+      viewer: form.elements.viewer.value.trim()
+    };
+    if (!game.jogo || !game.console) { setAdminMsg('✖ Preencha o jogo e o console.', true); return; }
+    runAdmin('add', game, 'Adicionado à fila: ' + game.jogo + ' [' + game.console + ']');
+  }
+
+  function submitRate(form) {
+    if (adminState.busy) return;
+    if (!authValid()) { expired(); return; }
+    var nota = parseFloat(String(form.elements.nota.value).replace(',', '.'));
+    if (!isFinite(nota) || nota < 0.5 || nota > MAX_SCORE || Math.round(nota * 2) !== nota * 2) {
+      setAdminMsg('✖ Nota inválida: use de 0,5 a ' + MAX_SCORE + ', de meio em meio ponto.', true);
+      return;
+    }
+    runAdmin('rate', { jogo: form.dataset.title, console: form.dataset.console, nota: nota },
+      'Nota ' + fmt(nota, 1) + ' para ' + form.dataset.title + ': saiu da fila.');
+  }
+
+  function onAdminClick(e) {
+    var btn = e.target.closest('button[data-admin]');
+    if (!btn) return false;
+    if (btn.dataset.admin === 'logout') signOut(false);
+    else setTab('admin');
+    return true;
+  }
+
+  function restoreAuth() {
+    if (!adminEnabled()) return;
+    try {
+      var t = sessionStorage.getItem('retro_tok');
+      if (t && decodeJwt(t).exp * 1000 > Date.now() + 60000) onCredential(t, true);
+    } catch (e) {}
+  }
+
+  $foot.addEventListener('click', onAdminClick);
+
+  $view.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (form.id === 'addForm') { e.preventDefault(); submitAdd(form); }
+    else if (form.classList && form.classList.contains('rate')) { e.preventDefault(); submitRate(form); }
+  });
+
+  $view.addEventListener('input', function (e) {
+    if (e.target.id === 'adminQ') { adminState.q = e.target.value; renderAdminList(); }
+  });
+
   $tabs.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-tab]');
     if (b) setTab(b.dataset.tab);
   });
 
   $view.addEventListener('click', function (e) {
+    if (onAdminClick(e)) return;
+    var demoBtn = e.target.closest('button[data-demo]');
+    if (demoBtn) { onCredential(fakeToken(demoBtn.dataset.demo), false); return; }
     var sortBtn = e.target.closest('button[data-sort]');
     if (sortBtn) {
       var cfg = state.sort[state.tab];
@@ -713,4 +1015,5 @@
   if (['ranking', 'consoles', 'viewers', 'zerados', 'fila', 'todos', 'sorteio'].indexOf(initial) !== -1) state.tab = initial;
 
   load();
+  restoreAuth();
 </script>

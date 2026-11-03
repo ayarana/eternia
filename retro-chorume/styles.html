@@ -65,6 +65,8 @@
   .tabs button,
   .field input,
   .field select,
+  .btn,
+  .rate input,
   .notice button {
     --fill: var(--black);
     --edge: linear-gradient(135deg, var(--lilac), var(--pink));
@@ -76,7 +78,7 @@
   }
 
   .win { overflow: hidden; }
-  .tabs button, .field input, .field select, .notice button { border-radius: var(--radius-sm); }
+  .tabs button, .field input, .field select, .btn, .rate input, .notice button { border-radius: var(--radius-sm); }
 
   .masthead { padding-top: 1.5rem; }
 
@@ -624,6 +626,34 @@
     padding: 0.2rem 0.9rem;
     border-radius: var(--radius);
     cursor: pointer;
+  }
+
+  .btn {
+    min-height: 2.4rem;
+    padding: 0.15rem 0.9rem;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { --fill: #1d1738; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+
+  .admin h2 { margin: 1.25rem 0 0.4rem; font: 400 1.75rem/1.1 var(--font-body); color: var(--pink); }
+  .admin > p { margin: 0 0 0.75rem; }
+  .admin .filters { align-items: flex-end; margin-bottom: 0.5rem; }
+
+  .gsi { min-height: 2.75rem; }
+
+  .msg { min-height: 1.4rem; margin: 0.4rem 0; color: var(--yellow); }
+  .msg--err { color: #ff7b9c; }
+
+  .rate { display: flex; align-items: center; gap: 0.4rem; }
+  .rate input { width: 5.5rem; min-height: 2.2rem; padding: 0.1rem 0.5rem; color: var(--yellow); }
+  .rate input:focus { --edge: linear-gradient(135deg, var(--yellow), var(--pink)); }
+
+  .tabs button[hidden] { display: none; }
+
+  @media (max-width: 30rem) {
+    .row--rate { grid-template-columns: 1fr; row-gap: 0.4rem; }
   }
 
   .foot {
