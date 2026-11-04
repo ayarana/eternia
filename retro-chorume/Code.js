@@ -201,6 +201,7 @@ function rateGame_(g, email) {
   const title = clean_(g.jogo);
   const platform = clean_(g.console);
   const score = Number(g.nota);
+  const zerado = g.zerado === true || g.zerado === 'true';
   if (!title || !platform) throw new Error('Faltou dizer qual jogo receber a nota.');
   if (!(score >= 0.5 && score <= CONFIG.MAX_SCORE) || Math.round(score * 2) !== score * 2) {
     throw new Error('Nota inválida: use de 0,5 a ' + CONFIG.MAX_SCORE + ', de meio em meio ponto.');
@@ -213,22 +214,29 @@ function rateGame_(g, email) {
     const rows = sheet.getDataRange().getValues();
 
     let found = -1;
+    let foundRaw = '';
     let rated = false;
     for (let i = 1; i < rows.length; i++) {
       const raw = clean_(rows[i][0]);
       if (!raw || raw === 'Jogo') continue;
       if (key_(splitTitle_(raw).title) !== key_(title) || key_(rows[i][1]) !== key_(platform)) continue;
-      if (parseScore_(rows[i][3]) === null) { found = i + 1; break; }
+      if (parseScore_(rows[i][3]) === null) { found = i + 1; foundRaw = String(rows[i][0]).trim(); break; }
       rated = true;
     }
     if (found === -1) throw new Error(rated ? 'Esse jogo já tem nota.' : 'Não achei esse jogo na lista. Atualize a página.');
 
     sheet.getRange(found, 4).setValue(score);
+    if (zerado && !/\(zerado\)/i.test(foundRaw)) {
+      const marked = foundRaw + ' (zerado)';
+      const titleCell = sheet.getRange(found, 1);
+      if (/^[=+\-@]/.test(marked)) titleCell.setNumberFormat('@');
+      titleCell.setValue(marked);
+    }
     SpreadsheetApp.flush();
 
     CacheService.getScriptCache().remove(CONFIG.CACHE_KEY);
-    console.log('Nota ' + score + ' dada por ' + email + ': ' + title + ' (linha ' + found + ')');
-    return { ok: true, row: found };
+    console.log('Nota ' + score + (zerado ? ' (zerado)' : '') + ' dada por ' + email + ': ' + title + ' (linha ' + found + ')');
+    return { ok: true, row: found, zerado: zerado };
   } finally {
     lock.releaseLock();
   }

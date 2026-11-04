@@ -337,13 +337,7 @@
   }
 
   function renderFooter() {
-    var html = '<button type="button" class="link" id="reload">Atualizar</button>';
-    if (adminEnabled()) {
-      html += auth.admin
-        ? '<button type="button" class="link" data-admin="logout">sair do admin</button>'
-        : '<button type="button" class="link" data-admin="login">admin</button>';
-    }
-    $foot.innerHTML = html;
+    $foot.innerHTML = '<button type="button" class="link" id="reload">Atualizar</button>';
     document.getElementById('reload').addEventListener('click', load);
   }
 
@@ -363,7 +357,7 @@
   }
 
   function setTab(tab) {
-    if (tab === 'admin' && !adminEnabled()) tab = 'ranking';
+    if (tab === 'admin' && !auth.admin) tab = 'ranking';
     if (tab !== 'admin') adminState.msg = null;
     state.tab = tab;
     if (history.replaceState) { try { history.replaceState(null, '', '#' + tab); } catch (e) {} }
@@ -691,7 +685,9 @@
   }
 
   var auth = { token: null, email: '', admin: false, exp: 0, gis: false };
+  var authUi = { open: false, msg: null };
   var adminState = { q: '', msg: null, busy: false };
+  var $auth = document.getElementById('authbar');
 
   function adminEnabled() {
     if (window.google && google.script && google.script.run) return false;
@@ -735,6 +731,7 @@
         var hit = same.filter(unplayed)[0];
         if (!hit) { reject(new Error('Não achei esse jogo na lista. Atualize a página.')); return; }
         hit.score = g.nota;
+        if (g.zerado) hit.done = true;
         resolve({ ok: true });
       }, 250);
     });
@@ -757,11 +754,12 @@
     });
   }
 
-  function setLoginMsg(text, isErr) {
-    var el = document.getElementById('loginMsg');
+  function setAuthMsg(text, isErr) {
+    authUi.msg = text ? { text: text, err: !!isErr } : null;
+    var el = document.getElementById('authMsg');
     if (!el) return;
-    el.textContent = text;
-    el.className = 'msg' + (isErr ? ' msg--err' : '');
+    el.textContent = text || '';
+    el.className = 'msg authbar__msg' + (isErr ? ' msg--err' : '');
   }
 
   function setAdminMsg(text, isErr) {
@@ -772,36 +770,39 @@
     el.className = 'msg' + (isErr ? ' msg--err' : '');
   }
 
-  function signOut(keepView) {
+  function signOut() {
     auth.token = null; auth.email = ''; auth.admin = false; auth.exp = 0;
     storeToken(null);
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}
     renderTabs();
-    renderFooter();
-    if (!keepView && state.tab === 'admin') setTab('ranking');
+    renderAuthbar();
+    if (state.tab === 'admin') setTab('ranking');
   }
 
   function expired() {
-    signOut(true);
-    renderView();
-    setLoginMsg('Seu login expirou (dura cerca de 1 hora). Entre de novo.', true);
+    authUi.open = false;
+    authUi.msg = { text: 'Seu login expirou (dura cerca de 1 hora). Entre de novo.', err: true };
+    signOut();
   }
 
   function onCredential(token, quiet) {
     var who = decodeJwt(token);
     auth.token = token; auth.exp = who.exp || 0; auth.email = who.email || '';
-    setLoginMsg('Verificando no servidor…', false);
+    if (!quiet) setAuthMsg('Verificando no servidor…', false);
     return adminPost('whoami', { idToken: token }).then(function (r) {
       auth.admin = true;
       auth.email = r.email || auth.email;
+      authUi.open = false;
+      authUi.msg = null;
       storeToken(token);
       renderTabs();
-      renderFooter();
+      renderAuthbar();
       if (!quiet) setTab('admin');
       else if (state.tab === 'admin') renderView();
     }, function (err) {
-      signOut(true);
-      if (!quiet) setLoginMsg('✖ ' + err.message, true);
+      authUi.msg = null;
+      signOut();
+      if (!quiet) setAuthMsg('✖ ' + err.message, true);
     });
   }
 
@@ -821,17 +822,13 @@
     return 'x.' + btoa(JSON.stringify({ email: email, exp: Math.floor(Date.now() / 1000) + 3600 })).replace(/=+$/, '') + '.x';
   }
 
-  function renderLoginView() {
-    $view.innerHTML =
-      '<div class="admin">' +
-        '<p>Entre com o Google para adicionar jogos e dar notas.</p>' +
-        '<div id="gsiBtn" class="gsi"></div>' +
-        '<div id="loginMsg" class="msg" role="status"></div>' +
-      '</div>';
+  function mountSignIn() {
+    var box = document.getElementById('gsiBtn');
+    if (!box) return;
     if (window.RETRO_DEMO) {
-      document.getElementById('gsiBtn').innerHTML =
-        '<button type="button" class="btn" data-demo="admin@demo">Entrar como admin (demo)</button> ' +
-        '<button type="button" class="btn" data-demo="visitante@demo">Entrar como visitante (demo)</button>';
+      box.innerHTML =
+        '<button type="button" class="btn btn--small" data-demo="admin@demo">Admin (demo)</button> ' +
+        '<button type="button" class="btn btn--small" data-demo="visitante@demo">Visitante (demo)</button>';
       return;
     }
     loadGis().then(function () {
@@ -844,11 +841,29 @@
         });
         auth.gis = true;
       }
-      var box = document.getElementById('gsiBtn');
-      if (box && state.tab === 'admin') {
-        google.accounts.id.renderButton(box, { theme: 'filled_black', size: 'large', shape: 'rectangular', text: 'signin_with', locale: 'pt-BR' });
+      var el = document.getElementById('gsiBtn');
+      if (el && authUi.open && !auth.admin) {
+        google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'medium', shape: 'rectangular', text: 'signin', locale: 'pt-BR' });
       }
-    }).catch(function (err) { setLoginMsg('✖ ' + err.message, true); });
+    }).catch(function (err) { setAuthMsg('✖ ' + err.message, true); });
+  }
+
+  function renderAuthbar() {
+    if (!adminEnabled()) { $auth.hidden = true; return; }
+    $auth.hidden = false;
+    var html;
+    if (auth.admin) {
+      html = '<span class="authbar__who" title="' + esc(auth.email) + '">' + esc(auth.email) + '</span>' +
+        '<button type="button" class="btn btn--small" data-auth="logout">Sair</button>';
+    } else if (authUi.open) {
+      html = '<div id="gsiBtn" class="gsi"></div>' +
+        '<button type="button" class="link" data-auth="close">cancelar</button>';
+    } else {
+      html = '<button type="button" class="btn btn--small" data-auth="open">Login</button>';
+    }
+    $auth.innerHTML = html + '<div id="authMsg" class="msg authbar__msg" role="status"></div>';
+    if (authUi.msg) setAuthMsg(authUi.msg.text, authUi.msg.err);
+    if (!auth.admin && authUi.open) mountSignIn();
   }
 
   function byPt(a, b) { return a.localeCompare(b, 'pt-BR'); }
@@ -858,14 +873,12 @@
   }
 
   function renderAdminView() {
-    if (!auth.admin) { renderLoginView(); return; }
+    if (!auth.admin) { setTab('ranking'); return; }
     var games = state.data.games;
     var consoles = groupStats(games, 'console').map(function (c) { return c.name; }).sort(byPt);
     var viewers = groupStats(games, 'viewer').map(function (c) { return c.name; }).sort(byPt);
     $view.innerHTML =
       '<div class="admin">' +
-        '<p class="count">Logado como <strong>' + esc(auth.email) + '</strong> ' +
-          '<button type="button" class="link" data-admin="logout">sair</button></p>' +
         '<h2>Novo jogo na fila</h2>' +
         '<form id="addForm" class="filters" autocomplete="off">' +
           '<label class="field field--grow">Jogo<input name="jogo" maxlength="150" required></label>' +
@@ -900,6 +913,7 @@
           (g.viewer ? '<span>' + esc(g.viewer) + '</span>' : '<span>sem viewer</span>') + '</div></div>' +
           '<form class="rate" data-title="' + esc(g.title) + '" data-console="' + esc(g.console) + '">' +
             '<input type="number" name="nota" min="0.5" max="' + MAX_SCORE + '" step="0.5" inputmode="decimal" required aria-label="Nota de ' + esc(g.title) + '">' +
+            '<label class="check"><input type="checkbox" name="zerado"> zerado</label>' +
             '<button type="submit" class="btn">Dar nota</button></form></li>';
       }).join('') + '</ul>';
     }
@@ -946,16 +960,9 @@
       setAdminMsg('✖ Nota inválida: use de 0,5 a ' + MAX_SCORE + ', de meio em meio ponto.', true);
       return;
     }
-    runAdmin('rate', { jogo: form.dataset.title, console: form.dataset.console, nota: nota },
-      'Nota ' + fmt(nota, 1) + ' para ' + form.dataset.title + ': saiu da fila.');
-  }
-
-  function onAdminClick(e) {
-    var btn = e.target.closest('button[data-admin]');
-    if (!btn) return false;
-    if (btn.dataset.admin === 'logout') signOut(false);
-    else setTab('admin');
-    return true;
+    var zerado = !!form.elements.zerado.checked;
+    runAdmin('rate', { jogo: form.dataset.title, console: form.dataset.console, nota: nota, zerado: zerado },
+      'Nota ' + fmt(nota, 1) + ' para ' + form.dataset.title + (zerado ? ' (zerado)' : '') + ': saiu da fila.');
   }
 
   function restoreAuth() {
@@ -966,7 +973,14 @@
     } catch (e) {}
   }
 
-  $foot.addEventListener('click', onAdminClick);
+  $auth.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-auth], button[data-demo]');
+    if (!b) return;
+    if (b.dataset.demo) { onCredential(fakeToken(b.dataset.demo), false); return; }
+    if (b.dataset.auth === 'open') { authUi.open = true; authUi.msg = null; renderAuthbar(); }
+    else if (b.dataset.auth === 'close') { authUi.open = false; authUi.msg = null; renderAuthbar(); }
+    else if (b.dataset.auth === 'logout') { authUi.open = false; authUi.msg = null; signOut(); }
+  });
 
   $view.addEventListener('submit', function (e) {
     var form = e.target;
@@ -984,9 +998,6 @@
   });
 
   $view.addEventListener('click', function (e) {
-    if (onAdminClick(e)) return;
-    var demoBtn = e.target.closest('button[data-demo]');
-    if (demoBtn) { onCredential(fakeToken(demoBtn.dataset.demo), false); return; }
     var sortBtn = e.target.closest('button[data-sort]');
     if (sortBtn) {
       var cfg = state.sort[state.tab];
@@ -1014,6 +1025,26 @@
   var initial = (location.hash || '').replace('#', '');
   if (['ranking', 'consoles', 'viewers', 'zerados', 'fila', 'todos', 'sorteio'].indexOf(initial) !== -1) state.tab = initial;
 
+  function placeAuthbar() {
+    var nav = document.querySelector('.sitenav');
+    var small = window.matchMedia && window.matchMedia('(max-width: 48rem)').matches;
+    if (nav && small) {
+      if ($auth.parentNode !== nav) nav.appendChild($auth);
+      $auth.classList.add('authbar--nav');
+    } else {
+      $auth.classList.remove('authbar--nav');
+      var page = document.querySelector('.page');
+      if (page && $auth.parentNode !== page.parentNode) page.parentNode.insertBefore($auth, page);
+    }
+  }
+  placeAuthbar();
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(max-width: 48rem)');
+    if (mq.addEventListener) mq.addEventListener('change', placeAuthbar);
+    else if (mq.addListener) mq.addListener(placeAuthbar);
+  }
+
+  renderAuthbar();
   load();
   restoreAuth();
 </script>

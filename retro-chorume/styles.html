@@ -641,16 +641,46 @@
   .admin > p { margin: 0 0 0.75rem; }
   .admin .filters { align-items: flex-end; margin-bottom: 0.5rem; }
 
-  .gsi { min-height: 2.75rem; }
+  .gsi { min-height: 2rem; }
 
   .msg { min-height: 1.4rem; margin: 0.4rem 0; color: var(--yellow); }
   .msg--err { color: #ff7b9c; }
 
-  .rate { display: flex; align-items: center; gap: 0.4rem; }
+  .rate { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.4rem 0.6rem; }
   .rate input { width: 5.5rem; min-height: 2.2rem; padding: 0.1rem 0.5rem; color: var(--yellow); }
   .rate input:focus { --edge: linear-gradient(135deg, var(--yellow), var(--pink)); }
 
   .tabs button[hidden] { display: none; }
+
+  .check { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text-soft); cursor: pointer; white-space: nowrap; }
+  .check input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--pink); cursor: pointer; }
+
+  .admin h2:first-child { margin-top: 0; }
+
+  .authbar {
+    position: absolute;
+    top: 0.9rem;
+    right: 1rem;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem 0.6rem;
+    max-width: 24rem;
+  }
+  .authbar[hidden] { display: none; }
+  .authbar__who { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); }
+  .authbar__msg { flex-basis: 100%; margin: 0; min-height: 0; text-align: right; }
+  .authbar__msg:empty { display: none; }
+  .btn--small { min-height: 2rem; padding: 0.05rem 0.8rem; }
+
+  @media (max-width: 48rem) {
+    .authbar { position: static; max-width: none; padding: 0.6rem 1rem 0; }
+    .authbar--nav { display: contents; }
+    .authbar--nav .btn { min-height: 0; padding: 0.35rem 0.9rem; font-size: 1.05rem; line-height: 1.2; }
+    .authbar--nav .authbar__msg { text-align: center; }
+  }
 
   @media (max-width: 30rem) {
     .row--rate { grid-template-columns: 1fr; row-gap: 0.4rem; }
