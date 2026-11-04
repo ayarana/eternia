@@ -684,7 +684,7 @@
     setTimeout(land, SPIN_MS + 400);
   }
 
-  var auth = { token: null, email: '', admin: false, exp: 0, gis: false };
+  var auth = { token: null, email: '', first: '', admin: false, exp: 0, gis: false };
   var authUi = { open: false, msg: null };
   var adminState = { q: '', msg: null, busy: false };
   var $auth = document.getElementById('authbar');
@@ -703,6 +703,15 @@
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
       }).join('')));
     } catch (e) { return {}; }
+  }
+
+  function firstName(who, email) {
+    var n = String(who.given_name || who.name || '').trim().split(/\s+/)[0];
+    if (!n) {
+      n = String(email || '').split('@')[0].split(/[._+\-]/)[0];
+      n = n.charAt(0).toUpperCase() + n.slice(1);
+    }
+    return n;
   }
 
   function authValid() { return !!auth.token && Date.now() / 1000 < auth.exp - 60; }
@@ -771,7 +780,7 @@
   }
 
   function signOut() {
-    auth.token = null; auth.email = ''; auth.admin = false; auth.exp = 0;
+    auth.token = null; auth.email = ''; auth.first = ''; auth.admin = false; auth.exp = 0;
     storeToken(null);
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}
     renderTabs();
@@ -787,11 +796,12 @@
 
   function onCredential(token, quiet) {
     var who = decodeJwt(token);
-    auth.token = token; auth.exp = who.exp || 0; auth.email = who.email || '';
+    auth.token = token; auth.exp = who.exp || 0; auth.email = who.email || ''; auth.first = firstName(who, auth.email);
     if (!quiet) setAuthMsg('Verificando no servidor…', false);
     return adminPost('whoami', { idToken: token }).then(function (r) {
       auth.admin = true;
       auth.email = r.email || auth.email;
+      if (!who.given_name && !who.name) auth.first = firstName(who, auth.email);
       authUi.open = false;
       authUi.msg = null;
       storeToken(token);
@@ -853,7 +863,7 @@
     $auth.hidden = false;
     var html;
     if (auth.admin) {
-      html = '<span class="authbar__who" title="' + esc(auth.email) + '">' + esc(auth.email) + '</span>' +
+      html = '<span class="authbar__who" title="' + esc(auth.email) + '">' + esc(auth.first || auth.email) + '</span>' +
         '<button type="button" class="btn btn--small" data-auth="logout">Sair</button>';
     } else if (authUi.open) {
       html = '<div id="gsiBtn" class="gsi"></div>' +
