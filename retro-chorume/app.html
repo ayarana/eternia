@@ -125,6 +125,7 @@
     data: null,
     tab: 'ranking',
     q: '',
+    vq: '',
     platform: '',
     order: 'asc',
     status: '',
@@ -515,9 +516,23 @@
   };
 
   function renderTable(which) {
+    $view.innerHTML =
+      (which === 'viewers'
+        ? '<div class="filters"><label class="field field--grow">Buscar viewer' +
+            '<input type="search" id="vq" value="' + esc(state.vq) + '" autocomplete="off"></label></div>'
+        : '') +
+      '<div id="tres"></div>';
+    fillTable(which);
+  }
+
+  function fillTable(which) {
     var field = which === 'consoles' ? 'console' : 'viewer';
     var rows = groupStats(state.data.games, field);
     var cfg = state.sort[which];
+    if (which === 'viewers' && norm(state.vq)) {
+      var vq = norm(state.vq);
+      rows = rows.filter(function (r) { return norm(r.name).indexOf(vq) !== -1; });
+    }
 
     rows.sort(function (a, b) {
       var av = a[cfg.key], bv = b[cfg.key];
@@ -541,18 +556,32 @@
       return '<tr><td>' + nameCell + '</td><td>' + fmt(r.avg, 2) + '</td><td>' + r.played + '</td><td>' + r.total + '</td></tr>';
     }).join('');
 
-    $view.innerHTML =
+    document.getElementById('tres').innerHTML =
       '<p class="count">' + plural(rows.length, which === 'consoles' ? 'console' : 'viewer', which === 'consoles' ? 'consoles' : 'viewers') + '</p>' +
-      '<div class="table-wrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+      (rows.length
+        ? '<div class="table-wrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+        : '<p class="count">Nenhum viewer encontrado.</p>');
   }
 
   var SPIN_MS = 5200;
   var SPIN_ROWS = 42;
-  var roulette = { busy: false, platform: '' };
+  var roulette = { busy: false, platform: '', fresh: false };
+
+  function playedViewers() {
+    var set = {};
+    state.data.games.forEach(function (g) {
+      if (g.viewer && !unplayed(g)) set[norm(g.viewer)] = true;
+    });
+    return set;
+  }
 
   function queueGames() {
+    var seen = roulette.fresh ? playedViewers() : null;
     return state.data.games.filter(function (g) {
-      return unplayed(g) && (!roulette.platform || g.console === roulette.platform);
+      if (!unplayed(g)) return false;
+      if (roulette.platform && g.console !== roulette.platform) return false;
+      if (seen && (!g.viewer || seen[norm(g.viewer)])) return false;
+      return true;
     });
   }
 
@@ -576,6 +605,7 @@
       '<section class="roulette">' +
         '<div class="roulette__top">' +
           '<label class="field"><span>Console</span><select id="rplatform">' + options + '</select></label>' +
+          '<label class="check"><input type="checkbox" id="rfresh"' + (roulette.fresh ? ' checked' : '') + '> Só viewers sem jogos jogados</label>' +
           '<p class="count" id="rcount"></p>' +
         '</div>' +
         '<div class="reel" id="reel" aria-hidden="true">' +
@@ -596,6 +626,10 @@
       updateRouletteCount();
       renderRemaining();
     });
+    document.getElementById('rfresh').addEventListener('change', function (e) {
+      roulette.fresh = e.target.checked;
+      updateRouletteCount();
+    });
     updateRouletteCount();
     renderRemaining();
   }
@@ -605,7 +639,7 @@
     document.getElementById('rcount').textContent = plural(n, 'jogo', 'jogos') + ' na fila';
     document.getElementById('spin').disabled = !n;
     if (!n) document.getElementById('rresult').innerHTML = '<p class="result__none">Nenhum jogo na fila' +
-      (roulette.platform ? ' para esse console' : '') + '.</p>';
+      (roulette.platform ? ' para esse console' : '') + (roulette.fresh ? ' de viewers sem jogos jogados' : '') + '.</p>';
     else document.getElementById('rresult').innerHTML = '';
   }
 
@@ -999,7 +1033,8 @@
   });
 
   $view.addEventListener('input', function (e) {
-    if (e.target.id === 'adminQ') { adminState.q = e.target.value; renderAdminList(); }
+    if (e.target.id === 'vq') { state.vq = e.target.value; fillTable('viewers'); }
+    else if (e.target.id === 'adminQ') { adminState.q = e.target.value; renderAdminList(); }
   });
 
   $tabs.addEventListener('click', function (e) {
